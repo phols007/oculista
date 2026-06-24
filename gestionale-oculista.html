@@ -943,11 +943,18 @@ function renderBoard(container, filtroSoloAttesa) {
     p.stato === STATI.IN_STOP && p.medicoAssegnato === me
   );
 
+  // Refertati/Consenso/Completati: assegnati a me
+  const postVisita = tutti.filter(p =>
+    (p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO || p.stato === STATI.COMPLETATO) &&
+    p.medicoAssegnato === me
+  );
+
   function rigaPaziente(p) {
     const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
     const isAttesa = p.stato === STATI.REGISTRATO || p.stato === STATI.IN_ATTESA;
     const isInCorso = p.stato === STATI.IN_CORSO;
     const isInStop  = p.stato === STATI.IN_STOP;
+    const isPostVisita = p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO || p.stato === STATI.COMPLETATO;
 
     let azioni = '';
     if (isAttesa) {
@@ -958,6 +965,11 @@ function renderBoard(container, filtroSoloAttesa) {
     } else if (isInStop) {
       azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>
                 <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
+    } else if (isPostVisita) {
+      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); generaPDF('${p.id}')">Genera PDF</button>`;
+      if (p.stato !== STATI.COMPLETATO) {
+        azioni += ` <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.COMPLETATO}')">Completa</button>`;
+      }
     }
 
     return `
@@ -986,6 +998,7 @@ function renderBoard(container, filtroSoloAttesa) {
     html += gruppo('In attesa', inAttesa);
     html += gruppo('In corso', inCorso);
     html += gruppo('In stop', inStop);
+    html += gruppo('Refertati / Da completare', postVisita);
   }
   html += '</div>';
 
@@ -1391,6 +1404,109 @@ registerRenderer('firma-consenso', function() {
     });
   });
 });
+
+// ── generaPDF ─────────────────────────────────────────────────────────────────
+function generaPDF(id) {
+  const p = db.getPaziente(id);
+  if (!p) { alert('Paziente non trovato.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 15;
+
+  const line = (t, b = false, size = 11) => {
+    doc.setFont('helvetica', b ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    for (const ln of doc.splitTextToSize(t, 180)) {
+      if (y > 275) { doc.addPage(); y = 15; }
+      doc.text(ln, 15, y);
+      y += 6;
+    }
+  };
+
+  const section = (title, lines) => {
+    y += 4;
+    line(title, true, 13);
+    y += 2;
+    if (Array.isArray(lines)) {
+      lines.forEach(t => line(t));
+    } else {
+      line(lines || '');
+    }
+    y += 3;
+  };
+
+  // Intestazione
+  line('Modulo Visita Oculistica', true, 16);
+  y += 4;
+
+  // DATI DEL PAZIENTE
+  const a = p.anagrafica || {};
+  section('DATI DEL PAZIENTE', [
+    'Nome e Cognome: ' + (a.nome || ''),
+    'Data di nascita: ' + (a.dataNascita || ''),
+    'Sesso: ' + (a.sesso || ''),
+    'Codice Fiscale: ' + (a.codiceFiscale || ''),
+    'Indirizzo: ' + (a.indirizzo || ''),
+    'Telefono: ' + (a.telefono || ''),
+    'Email: ' + (a.email || '')
+  ]);
+
+  // MOTIVO DELLA VISITA
+  const m = p.motivo || {};
+  const motivoVoci = [];
+  if (m.controllo) motivoVoci.push('Visita di controllo');
+  if (m.disturbi) motivoVoci.push('Disturbi visivi (' + m.disturbi + ')');
+  if (m.prescrizione) motivoVoci.push('Prescrizione occhiali/lenti');
+  if (m.altro) motivoVoci.push('Altro (' + m.altro + ')');
+  section('MOTIVO DELLA VISITA', motivoVoci.length ? motivoVoci : ['Non specificato']);
+
+  // ANAMNESI OCULARE E GENERALE
+  const n = p.anamnesi || {};
+  section('ANAMNESI OCULARE E GENERALE', [
+    'APO - Anamnesi Patologica Oculare: ' + (n.apo || ''),
+    'APG - Anamnesi Patologica Generale: ' + (n.apg || ''),
+    'Ha mai avuto problemi agli occhi?: ' + (n.problemiOcchi || ''),
+    'Se sì, quali?: ' + (n.qualiProblemi || ''),
+    'Porta occhiali o lenti a contatto?: ' + (n.portaOcchiali || ''),
+    'Da quanto tempo?: ' + (n.daQuanto || ''),
+    'Malattie sistemiche: ' + (n.malattie || ''),
+    'Farmaci assunti: ' + (n.farmaci || ''),
+    'Interventi oculari pregressi: ' + (n.interventi || '')
+  ]);
+
+  // ESAME OBIETTIVO OCULARE
+  const r = p.referto || {};
+  const od = r.refOD || {};
+  const os = r.refOS || {};
+  section('ESAME OBIETTIVO OCULARE', [
+    'Esame Annessi e Segmento Anteriore: ' + (r.annessi || ''),
+    'Acuità Visiva per Lontano OD: ' + (r.acuitaLontanoOD || ''),
+    'Acuità Visiva per Lontano OS: ' + (r.acuitaLontanoOS || ''),
+    'Acuità Visiva per Vicino OD: ' + (r.acuitaVicinoOD || ''),
+    'Acuità Visiva per Vicino OS: ' + (r.acuitaVicinoOS || ''),
+    'Refrazione OD: Sph ' + (od.sph || '') + ' Cyl ' + (od.cyl || '') + ' Asse ' + (od.asse || ''),
+    'Refrazione OS: Sph ' + (os.sph || '') + ' Cyl ' + (os.cyl || '') + ' Asse ' + (os.asse || ''),
+    'Pressione Intraoculare OD: ' + (r.pressioneOD || '') + ' mmHg',
+    'Pressione Intraoculare OS: ' + (r.pressioneOS || '') + ' mmHg',
+    'Esame del Fondo Oculare: ' + (r.fondo || ''),
+    'Altri Esami: ' + (r.altriEsami || '')
+  ]);
+
+  // DIAGNOSI E PRESCRIZIONE
+  section('DIAGNOSI E PRESCRIZIONE', r.diagnosi || '');
+
+  // Firma consenso
+  if (p.firmaConsenso) {
+    y += 4;
+    line('Firma consenso trattamento dati:', true);
+    if (y > 240) { doc.addPage(); y = 15; }
+    doc.addImage(p.firmaConsenso, 'PNG', 15, y, 80, 30);
+    y += 34;
+  }
+
+  const nomeFile = (a.nome || 'paziente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+  doc.save(nomeFile);
+}
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 render();
