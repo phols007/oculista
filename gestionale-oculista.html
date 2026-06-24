@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Gestionale Oculistico</title>
+  <style>
+    /* ── Token CSS "Demo Laboratorio" ── */
+    :root {
+      --card:    #f5f5f7;
+      --txt:     #1d1d1f;
+      --txt2:    #6e6e73;
+      --ambra:   #fde68a;
+      --ambra-txt:#92651a;
+      --verde:   #34c759;
+      --rosso:   #ff3b30;
+      --bordo:   #d2d2d7;
+      --r:       14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--txt);
+      background: #fff;
+      min-height: 100vh;
+    }
+
+    /* ── Shell layout ── */
+    #app {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+
+    #sidebar {
+      background: var(--card);
+      border-right: 1px solid var(--bordo);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #main {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    /* ── Views ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--r);
+      padding: 20px;
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--card);
+      color: var(--txt2);
+      border: 1px solid var(--bordo);
+    }
+    .badge.ambra  { background: var(--ambra);  color: var(--ambra-txt); border-color: transparent; }
+    .badge.verde  { background: var(--verde);   color: #fff;             border-color: transparent; }
+    .badge.rosso  { background: var(--rosso);   color: #fff;             border-color: transparent; }
+
+    /* ── Bottoni ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 16px;
+      min-height: 44px;
+      border-radius: 10px;
+      border: 1px solid var(--bordo);
+      background: #fff;
+      color: var(--txt);
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover  { opacity: .75; }
+    .btn-danger { background: var(--rosso); color: #fff; border-color: transparent; }
+    .btn-primary { background: var(--txt); color: #fff; border-color: transparent; }
+
+    /* ── Timeline ── */
+    .timeline { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .timeline li { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--txt2); }
+    .timeline li::before { content: '○'; font-size: 1rem; flex-shrink: 0; }
+    .timeline .done    { color: var(--txt); }
+    .timeline .done::before  { content: '●'; color: var(--verde); }
+    .timeline .current { color: var(--txt); font-weight: 600; }
+    .timeline .current::before { content: '◉'; color: var(--ambra-txt); }
+
+    /* ── Hamburger (mobile) ── */
+    #hamburger {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 200;
+      background: var(--card);
+      border: 1px solid var(--bordo);
+      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    /* ── Responsive drawer ── */
+    @media (max-width: 820px) {
+      #hamburger { display: flex; }
+
+      #app { grid-template-columns: 1fr; }
+
+      #sidebar {
+        position: fixed;
+        top: 0; left: 0;
+        width: 260px;
+        height: 100vh;
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        border-right: 1px solid var(--bordo);
+        box-shadow: 4px 0 16px rgba(0,0,0,.12);
+      }
+      #sidebar.open { transform: translateX(0); }
+
+      #main { padding: 16px; padding-top: 68px; }
+    }
+
+    /* ── Sidebar nav ── */
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      color: var(--txt);
+      transition: background .15s;
+    }
+    .nav-item:hover  { background: rgba(0,0,0,.05); }
+    .nav-item.active { background: var(--txt); color: #fff; }
+
+    .sidebar-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--txt2);
+      padding: 8px 12px 4px;
+    }
+
+    /* ── Placeholder ── */
+    .placeholder {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--txt2);
+    }
+    .placeholder h2 { font-size: 1.4rem; margin-bottom: 8px; color: var(--txt); }
+  </style>
+</head>
+<body>
+
+<button id="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">☰</button>
+
+<div id="app">
+  <div id="sidebar">
+    <div style="font-size:1.1rem; font-weight:700; padding:4px 12px 16px;">👁 Oculistica</div>
+
+    <div class="sidebar-title">Navigazione</div>
+    <div class="nav-item active" data-view="board">📋 Pazienti</div>
+    <div class="nav-item" data-view="nuovo">➕ Nuovo Paziente</div>
+
+    <div style="flex:1;"></div>
+    <div class="sidebar-title">Sistema</div>
+    <div class="nav-item" data-view="impostazioni">⚙️ Impostazioni</div>
+  </div>
+
+  <div id="main">
+    <div id="view-board" class="view active">
+      <div class="placeholder">
+        <h2>Gestionale Oculistico</h2>
+        <p>Scaffold pronto. Board pazienti — in costruzione.</p>
+      </div>
+    </div>
+
+    <div id="view-nuovo" class="view">
+      <div class="placeholder">
+        <h2>Nuovo Paziente</h2>
+        <p>Form registrazione — in costruzione.</p>
+      </div>
+    </div>
+
+    <div id="view-impostazioni" class="view">
+      <div class="placeholder">
+        <h2>Impostazioni</h2>
+        <p>In costruzione.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- jsPDF CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+// ── Costanti ──────────────────────────────────────────────────────────────────
+const LS_KEY = 'oculista_pazienti';
+
+const STATI = {
+  REGISTRATO: 'Registrato',
+  IN_ATTESA:  'In attesa',
+  IN_CORSO:   'In corso',
+  IN_STOP:    'In stop',
+  REFERTATO:  'Refertato',
+  CONSENSO:   'Consenso firmato',
+  COMPLETATO: 'Completato'
+};
+
+// ── uuid ──────────────────────────────────────────────────────────────────────
+function uuid() {
+  return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+// ── Modulo db ─────────────────────────────────────────────────────────────────
+const db = {
+  getPazienti() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
+  },
+  _save(arr) {
+    localStorage.setItem(LS_KEY, JSON.stringify(arr));
+  },
+  getPaziente(id) {
+    return this.getPazienti().find(p => p.id === id);
+  },
+  savePaziente(p) {
+    const arr = this.getPazienti();
+    if (!p.id) p.id = uuid();
+    p.createdAt = p.createdAt || new Date().toISOString();
+    p.updatedAt = new Date().toISOString();
+    arr.push(p);
+    this._save(arr);
+    return p;
+  },
+  updatePaziente(id, patch) {
+    const arr = this.getPazienti();
+    const i = arr.findIndex(p => p.id === id);
+    if (i < 0) return;
+    const cur = arr[i];
+    for (const k of ['anagrafica', 'motivo', 'anamnesi', 'referto']) {
+      if (patch[k]) patch[k] = { ...cur[k], ...patch[k] };
+    }
+    arr[i] = { ...cur, ...patch, updatedAt: new Date().toISOString() };
+    this._save(arr);
+    return arr[i];
+  },
+  removeAll() {
+    localStorage.removeItem(LS_KEY);
+  }
+};
+
+// ── Factory schema paziente ───────────────────────────────────────────────────
+function nuovoPaziente() {
+  return {
+    id: uuid(),
+    stato: STATI.REGISTRATO,
+    medicoAssegnato: null,
+    anagrafica: {
+      nome: '', dataNascita: '', sesso: '', codiceFiscale: '',
+      indirizzo: '', telefono: '', email: ''
+    },
+    motivo: {
+      controllo: false, disturbi: '', prescrizione: false, altro: ''
+    },
+    anamnesi: {
+      problemiOcchi: 'No', qualiProblemi: '', portaOcchiali: 'No',
+      daQuanto: '', malattie: '', farmaci: '', interventi: ''
+    },
+    referto: {
+      annessi: '', acuitaLontanoOD: '', acuitaLontanoOS: '',
+      acuitaVicinoOD: '', acuitaVicinoOS: '',
+      refOD: { sph: '', cyl: '', asse: '' },
+      refOS: { sph: '', cyl: '', asse: '' },
+      pressioneOD: '', pressioneOS: '', fondo: '', altriEsami: '', diagnosi: ''
+    },
+    firmaConsenso: null,
+    eventi: [],
+    createdAt: null,
+    updatedAt: null
+  };
+}
+
+// ── Session helper (stub — sarà implementato in task login) ───────────────────
+function sessionCorrente() { return null; }
+
+// ── pushEvento ────────────────────────────────────────────────────────────────
+function pushEvento(id, stato) {
+  const p = db.getPaziente(id);
+  if (!p) return;
+  const ev = {
+    stato,
+    ts: new Date().toISOString(),
+    utente: (sessionCorrente && sessionCorrente()?.user) || 'paziente'
+  };
+  return db.updatePaziente(id, { stato, eventi: [...(p.eventi || []), ev] });
+}
+
+// ── Navigazione sidebar ───────────────────────────────────────────────────────
+document.querySelectorAll('[data-view]').forEach(el => {
+  el.addEventListener('click', () => {
+    const target = el.dataset.view;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('[data-view]').forEach(n => n.classList.remove('active'));
+    const viewEl = document.getElementById('view-' + target);
+    if (viewEl) viewEl.classList.add('active');
+    el.classList.add('active');
+    // Chiudi drawer su mobile
+    document.getElementById('sidebar').classList.remove('open');
+  });
+});
+
+// ── Chiudi sidebar cliccando fuori (mobile) ───────────────────────────────────
+document.getElementById('main').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open');
+});
+</script>
+</body>
+</html>
