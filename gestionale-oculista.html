@@ -586,6 +586,286 @@ function handleLoginSubmit(e) {
   }
 }
 
+// ── Form CSS (anagrafica) ─────────────────────────────────────────────────────
+(function injectFormCSS() {
+  const s = document.createElement('style');
+  s.textContent = `
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-col-full { grid-column: 1 / -1; }
+    .form-section { margin-bottom: 28px; }
+    .form-section h3 {
+      font-size: 0.8rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--txt2);
+      margin-bottom: 14px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--bordo);
+    }
+    .form-field { display: flex; flex-direction: column; gap: 4px; }
+    .form-field label { font-size: 0.82rem; color: var(--txt2); }
+    .form-field input[type=text],
+    .form-field input[type=date],
+    .form-field input[type=email],
+    .form-field input[type=tel],
+    .form-field textarea {
+      width: 100%; padding: 9px 12px;
+      border-radius: 10px; border: 1px solid var(--bordo);
+      background: #fff; font-size: 0.9rem; font-family: inherit;
+      color: var(--txt); outline: none; transition: border-color .15s;
+    }
+    .form-field input:focus,
+    .form-field textarea:focus { border-color: var(--txt); }
+    .form-field input:disabled,
+    .form-field textarea:disabled {
+      background: var(--card); color: var(--txt2); cursor: default;
+    }
+    .form-field textarea { resize: vertical; min-height: 72px; }
+    .radio-group, .check-group { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .radio-group label, .check-group label {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.9rem; color: var(--txt); cursor: pointer;
+    }
+    .sub-input { margin-top: 6px; }
+    .form-error { color: var(--rosso); font-size: 0.85rem; min-height: 1.2em; margin-top: 4px; }
+    .conferma-box {
+      text-align: center; padding: 48px 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .conferma-box .icon { font-size: 3rem; }
+    .conferma-box h2 { font-size: 1.5rem; font-weight: 700; }
+    .conferma-box p { color: var(--txt2); }
+  `;
+  document.head.appendChild(s);
+})();
+
+// ── renderAnagrafica ──────────────────────────────────────────────────────────
+// Signature: renderAnagrafica(container, {paziente, editable, onSubmit, submitLabel})
+function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit, submitLabel = 'Invia' }) {
+  const p = paziente;
+  const a = p.anagrafica || {};
+  const m = p.motivo   || {};
+  const n = p.anamnesi || {};
+
+  const dis = editable ? '' : 'disabled';
+
+  // Helper: input text
+  function inp(field, value = '', placeholder = '', type = 'text', extraClass = '') {
+    const v = (value || '').toString().replace(/"/g, '&quot;');
+    return `<input type="${type}" data-field="${field}" value="${v}" placeholder="${placeholder}" ${dis} class="${extraClass}">`;
+  }
+  function textarea(field, value = '', placeholder = '') {
+    const v = (value || '').toString().replace(/</g, '&lt;');
+    return `<textarea data-field="${field}" placeholder="${placeholder}" ${dis}>${v}</textarea>`;
+  }
+  function radio(name, field, val, checked, label) {
+    const c = checked ? 'checked' : '';
+    return `<label><input type="radio" name="${name}" data-field="${field}" value="${val}" ${c} ${dis}> ${label}</label>`;
+  }
+  function checkbox(field, checked, label) {
+    const c = checked ? 'checked' : '';
+    return `<label><input type="checkbox" data-field="${field}" ${c} ${dis}> ${label}</label>`;
+  }
+
+  container.innerHTML = `
+<form id="form-anagrafica" autocomplete="off">
+  <div id="form-error" class="form-error"></div>
+
+  <!-- Dati paziente -->
+  <div class="form-section">
+    <h3>Dati paziente</h3>
+    <div class="form-grid">
+      <div class="form-field">
+        <label>Nome e Cognome *</label>
+        ${inp('anagrafica.nome', a.nome, 'Es. Anna Verdi')}
+      </div>
+      <div class="form-field">
+        <label>Data di nascita * (GG/MM/AAAA)</label>
+        ${inp('anagrafica.dataNascita', a.dataNascita, 'GG/MM/AAAA')}
+      </div>
+      <div class="form-field">
+        <label>Sesso</label>
+        <div class="radio-group">
+          ${radio('sesso', 'anagrafica.sesso', 'M', a.sesso === 'M', 'M')}
+          ${radio('sesso', 'anagrafica.sesso', 'F', a.sesso === 'F', 'F')}
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Codice Fiscale</label>
+        ${inp('anagrafica.codiceFiscale', a.codiceFiscale, 'RSSMRA80A01H501Z')}
+      </div>
+      <div class="form-field form-col-full">
+        <label>Indirizzo</label>
+        ${inp('anagrafica.indirizzo', a.indirizzo, 'Via Roma 1, Milano')}
+      </div>
+      <div class="form-field">
+        <label>Telefono</label>
+        ${inp('anagrafica.telefono', a.telefono, '+39 320 000 0000', 'tel')}
+      </div>
+      <div class="form-field">
+        <label>Email</label>
+        ${inp('anagrafica.email', a.email, 'nome@email.it', 'email')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Motivo visita -->
+  <div class="form-section">
+    <h3>Motivo visita</h3>
+    <div class="check-group" style="flex-direction:column; align-items:flex-start; gap:10px;">
+      ${checkbox('motivo.controllo', m.controllo, 'Visita di controllo')}
+      <div>
+        ${checkbox('motivo.disturbiCheck', !!m.disturbi, 'Disturbi visivi')}
+        <div class="sub-input">
+          ${inp('motivo.disturbi', m.disturbi, 'Descrivi i disturbi...', 'text')}
+        </div>
+      </div>
+      ${checkbox('motivo.prescrizione', m.prescrizione, 'Prescrizione occhiali/lenti')}
+      <div>
+        ${checkbox('motivo.altroCheck', !!m.altro, 'Altro')}
+        <div class="sub-input">
+          ${inp('motivo.altro', m.altro, 'Specifica...', 'text')}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anamnesi -->
+  <div class="form-section">
+    <h3>Anamnesi</h3>
+    <div class="form-grid">
+      <div class="form-field">
+        <label>Ha mai avuto problemi agli occhi?</label>
+        <div class="radio-group">
+          ${radio('problemiOcchi', 'anamnesi.problemiOcchi', 'Sì', n.problemiOcchi === 'Sì', 'Sì')}
+          ${radio('problemiOcchi', 'anamnesi.problemiOcchi', 'No', n.problemiOcchi !== 'Sì', 'No')}
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Se sì, quali?</label>
+        ${inp('anamnesi.qualiProblemi', n.qualiProblemi, 'Descrivi...')}
+      </div>
+      <div class="form-field">
+        <label>Porta occhiali o lenti a contatto?</label>
+        <div class="radio-group">
+          ${radio('portaOcchiali', 'anamnesi.portaOcchiali', 'Sì', n.portaOcchiali === 'Sì', 'Sì')}
+          ${radio('portaOcchiali', 'anamnesi.portaOcchiali', 'No', n.portaOcchiali !== 'Sì', 'No')}
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Da quanto tempo?</label>
+        ${inp('anamnesi.daQuanto', n.daQuanto, 'Es. 2 anni')}
+      </div>
+      <div class="form-field form-col-full">
+        <label>Malattie sistemiche</label>
+        ${inp('anamnesi.malattie', n.malattie, 'Es. ipertensione, diabete...')}
+      </div>
+      <div class="form-field form-col-full">
+        <label>Farmaci assunti</label>
+        ${inp('anamnesi.farmaci', n.farmaci, 'Es. betabloccanti...')}
+      </div>
+      <div class="form-field form-col-full">
+        <label>Interventi oculari pregressi</label>
+        ${inp('anamnesi.interventi', n.interventi, 'Es. cataratta, refrattiva...')}
+      </div>
+    </div>
+  </div>
+
+  ${editable ? `<button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">${submitLabel}</button>` : ''}
+</form>`;
+
+  // Submit handler
+  if (editable && onSubmit) {
+    container.querySelector('#form-anagrafica').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const dati = leggiAnagraficaDalForm(container);
+      const errEl = container.querySelector('#form-error');
+      // Validazione: Nome e Data nascita obbligatori
+      if (!dati.anagrafica.nome.trim()) {
+        errEl.textContent = 'Il campo Nome e Cognome è obbligatorio.';
+        return;
+      }
+      if (!dati.anagrafica.dataNascita.trim()) {
+        errEl.textContent = 'Il campo Data di nascita è obbligatorio.';
+        return;
+      }
+      errEl.textContent = '';
+      onSubmit(dati);
+    });
+  }
+}
+
+// ── leggiAnagraficaDalForm ────────────────────────────────────────────────────
+function leggiAnagraficaDalForm(container) {
+  function val(field) {
+    const el = container.querySelector(`[data-field="${field}"]`);
+    return el ? el.value : '';
+  }
+  function checked(field) {
+    const el = container.querySelector(`[data-field="${field}"]`);
+    return el ? el.checked : false;
+  }
+  function radio(field) {
+    const el = container.querySelector(`[data-field="${field}"]:checked`);
+    return el ? el.value : '';
+  }
+
+  return {
+    anagrafica: {
+      nome:          val('anagrafica.nome'),
+      dataNascita:   val('anagrafica.dataNascita'),
+      sesso:         radio('anagrafica.sesso'),
+      codiceFiscale: val('anagrafica.codiceFiscale'),
+      indirizzo:     val('anagrafica.indirizzo'),
+      telefono:      val('anagrafica.telefono'),
+      email:         val('anagrafica.email')
+    },
+    motivo: {
+      controllo:   checked('motivo.controllo'),
+      disturbi:    checked('motivo.disturbiCheck') ? val('motivo.disturbi') : '',
+      prescrizione: checked('motivo.prescrizione'),
+      altro:       checked('motivo.altroCheck') ? val('motivo.altro') : ''
+    },
+    anamnesi: {
+      problemiOcchi: radio('anamnesi.problemiOcchi'),
+      qualiProblemi: val('anamnesi.qualiProblemi'),
+      portaOcchiali: radio('anamnesi.portaOcchiali'),
+      daQuanto:      val('anamnesi.daQuanto'),
+      malattie:      val('anamnesi.malattie'),
+      farmaci:       val('anamnesi.farmaci'),
+      interventi:    val('anamnesi.interventi')
+    }
+  };
+}
+
+// ── Renderer: vista registrazione paziente ────────────────────────────────────
+registerRenderer('registrazione', function() {
+  const container = document.getElementById('view-registrazione');
+
+  function mostraConferma(nome) {
+    container.innerHTML = `
+      <div class="conferma-box">
+        <div class="icon">✅</div>
+        <h2>Registrazione inviata</h2>
+        <p>Grazie, <strong>${nome}</strong>. La tua registrazione è stata ricevuta.<br>
+           Attendi di essere chiamato dal medico.</p>
+        <button class="btn btn-primary" id="btn-nuova-reg">Nuova registrazione</button>
+      </div>`;
+    container.querySelector('#btn-nuova-reg').addEventListener('click', function() {
+      showView('registrazione');
+    });
+  }
+
+  renderAnagrafica(container, {
+    paziente: nuovoPaziente(),
+    editable: true,
+    submitLabel: 'Invia registrazione',
+    onSubmit: function(dati) {
+      const p = nuovoPaziente();
+      const salvato = db.savePaziente({ ...p, ...dati, stato: STATI.REGISTRATO });
+      mostraConferma(dati.anagrafica.nome);
+    }
+  });
+});
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 render();
 </script>
