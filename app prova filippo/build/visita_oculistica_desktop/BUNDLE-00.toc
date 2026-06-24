@@ -1,0 +1,3 @@
+([('visita_oculistica_desktop',
+   '/Users/filippotatti/Desktop/dist/visita_oculistica_desktop',
+   'EXECUTABLE')],)
