@@ -240,6 +240,48 @@
       white-space: nowrap;
     }
 
+    /* ── Board ── */
+    .board-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .board-group {
+      background: var(--card);
+      border-radius: var(--r);
+      overflow: hidden;
+    }
+    .board-group-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--txt2);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--bordo);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .board-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--bordo);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .board-row:last-child { border-bottom: none; }
+    .board-row:hover { background: rgba(0,0,0,.04); }
+    .board-nome { flex: 1; font-size: 0.95rem; font-weight: 500; }
+    .board-azioni { margin-left: auto; }
+    .board-empty {
+      padding: 20px 16px;
+      color: var(--txt2);
+      font-size: 0.9rem;
+    }
+
     /* ── Placeholder ── */
     .placeholder {
       text-align: center;
@@ -330,6 +372,10 @@
         <h2>Firma Consenso</h2>
         <p>Firma consenso informato — in costruzione.</p>
       </div>
+    </div>
+
+    <div id="view-dettaglio" class="view">
+      <!-- Populated by apriDettaglio / prendiInCarico fallback -->
     </div>
   </div>
 </div>
@@ -835,6 +881,147 @@ function leggiAnagraficaDalForm(container) {
     }
   };
 }
+
+// ── Board: badge colore per stato ────────────────────────────────────────────
+function badgeStato(stato) {
+  const cls = stato === STATI.IN_CORSO ? 'verde'
+             : stato === STATI.IN_STOP  ? 'rosso'
+             : 'ambra';
+  return `<span class="badge ${cls}">${stato}</span>`;
+}
+
+// ── setStato ──────────────────────────────────────────────────────────────────
+function setStato(id, stato) {
+  pushEvento(id, stato);
+  showView('board');
+}
+
+// ── prendiInCarico ────────────────────────────────────────────────────────────
+function prendiInCarico(id) {
+  const sess = sessionCorrente();
+  db.updatePaziente(id, { medicoAssegnato: sess.user });
+  pushEvento(id, STATI.IN_CORSO);
+  apriDettaglio(id);
+}
+
+// ── renderBoard ───────────────────────────────────────────────────────────────
+function renderBoard(container, filtroSoloAttesa) {
+  const sess = sessionCorrente();
+  if (!sess) return;
+  const me = sess.user;
+
+  // Ottieni tutti i pazienti e filtra per ruolo/assegnazione
+  const tutti = db.getPazienti();
+
+  // In attesa: Registrato o In attesa, non assegnati O assegnati a me
+  const inAttesa = tutti.filter(p =>
+    (p.stato === STATI.REGISTRATO || p.stato === STATI.IN_ATTESA) &&
+    (p.medicoAssegnato == null || p.medicoAssegnato === me)
+  );
+
+  // In corso: assegnati a me
+  const inCorso = tutti.filter(p =>
+    p.stato === STATI.IN_CORSO && p.medicoAssegnato === me
+  );
+
+  // In stop: assegnati a me
+  const inStop = tutti.filter(p =>
+    p.stato === STATI.IN_STOP && p.medicoAssegnato === me
+  );
+
+  function rigaPaziente(p) {
+    const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+    const isAttesa = p.stato === STATI.REGISTRATO || p.stato === STATI.IN_ATTESA;
+    const isInCorso = p.stato === STATI.IN_CORSO;
+    const isInStop  = p.stato === STATI.IN_STOP;
+
+    let azioni = '';
+    if (isAttesa) {
+      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); prendiInCarico('${p.id}')">Prendi in carico</button>`;
+    } else if (isInCorso) {
+      azioni = `<button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_STOP}')">In stop</button>`;
+    } else if (isInStop) {
+      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
+    }
+
+    return `
+      <div class="board-row" onclick="apriDettaglio('${p.id}')" title="Apri dettaglio">
+        <span class="board-nome">${nome}</span>
+        ${badgeStato(p.stato)}
+        <span class="board-azioni">${azioni}</span>
+      </div>`;
+  }
+
+  function gruppo(titolo, lista) {
+    const righe = lista.length
+      ? lista.map(rigaPaziente).join('')
+      : `<div class="board-empty">Nessun paziente</div>`;
+    return `
+      <div class="board-group">
+        <div class="board-group-title">${titolo} <span class="badge">${lista.length}</span></div>
+        ${righe}
+      </div>`;
+  }
+
+  let html = '<div class="board-wrapper">';
+  if (filtroSoloAttesa) {
+    html += gruppo('In attesa', inAttesa);
+  } else {
+    html += gruppo('In attesa', inAttesa);
+    html += gruppo('In corso', inCorso);
+    html += gruppo('In stop', inStop);
+  }
+  html += '</div>';
+
+  // Sostituisce solo il contenuto della vista (non il wrapper .view)
+  if (container.id && container.id.startsWith('view-')) {
+    container.innerHTML = html;
+  } else {
+    container.innerHTML = html;
+  }
+}
+
+// ── apriDettaglio ─────────────────────────────────────────────────────────────
+function apriDettaglio(id) {
+  if (typeof renderDettaglio === 'function') {
+    renderDettaglio(document.getElementById('view-dettaglio'), id);
+    showView('dettaglio');
+    return;
+  }
+  // Fallback: anagrafica confermabile nel view-dettaglio
+  const container = document.getElementById('view-dettaglio');
+  showView('dettaglio');
+  const p = db.getPaziente(id);
+  const wrapper = document.createElement('div');
+  container.innerHTML = '';
+  container.appendChild(wrapper);
+  const backBtn = document.createElement('button');
+  backBtn.className = 'btn';
+  backBtn.style.marginBottom = '16px';
+  backBtn.textContent = '← Torna alla board';
+  backBtn.onclick = () => showView('board');
+  wrapper.appendChild(backBtn);
+  const formEl = document.createElement('div');
+  wrapper.appendChild(formEl);
+  renderAnagrafica(formEl, {
+    paziente: p,
+    editable: true,
+    submitLabel: 'Conferma e procedi',
+    onSubmit: function(dati) {
+      db.updatePaziente(id, dati);
+      showView('board');
+    }
+  });
+}
+
+// ── Registra renderer board e attesa ─────────────────────────────────────────
+registerRenderer('board', function() {
+  renderBoard(document.getElementById('view-board'), false);
+});
+
+registerRenderer('in-attesa', function() {
+  renderBoard(document.getElementById('view-in-attesa'), true);
+});
 
 // ── Renderer: vista registrazione paziente ────────────────────────────────────
 registerRenderer('registrazione', function() {
