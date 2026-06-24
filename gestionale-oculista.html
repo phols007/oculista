@@ -289,6 +289,16 @@
       color: var(--txt2);
     }
     .placeholder h2 { font-size: 1.4rem; margin-bottom: 8px; color: var(--txt); }
+
+    /* ── Canvas firma ── */
+    #canvas-firma {
+      touch-action: none;
+      border: 1px solid var(--bordo);
+      border-radius: 10px;
+      background: #fff;
+      display: block;
+      max-width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -1242,6 +1252,143 @@ registerRenderer('registrazione', function() {
       const salvato = db.savePaziente({ ...p, ...dati, stato: STATI.REGISTRATO });
       mostraConferma(dati.anagrafica.nome);
     }
+  });
+});
+
+// ── initFirmaCanvas ───────────────────────────────────────────────────────────
+function initFirmaCanvas(canvas){
+  const ctx=canvas.getContext('2d'); let drawing=false, dirty=false;
+  ctx.lineWidth=2; ctx.lineCap='round'; ctx.strokeStyle='#111';
+  const pos=e=>{const r=canvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top];};
+  canvas.addEventListener('pointerdown',e=>{drawing=true;dirty=true;const[x,y]=pos(e);ctx.beginPath();ctx.moveTo(x,y);canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener('pointermove',e=>{if(!drawing)return;const[x,y]=pos(e);ctx.lineTo(x,y);ctx.stroke();});
+  canvas.addEventListener('pointerup',()=>drawing=false);
+  return { toDataURL:()=>canvas.toDataURL('image/png'), isEmpty:()=>!dirty, clear:()=>{ctx.clearRect(0,0,canvas.width,canvas.height);dirty=false;} };
+}
+
+// ── renderConsenso ────────────────────────────────────────────────────────────
+function renderConsenso(container, id) {
+  const p = db.getPaziente(id);
+  if (!p) { container.innerHTML = '<p>Paziente non trovato.</p>'; return; }
+  const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+
+  container.innerHTML = `
+<div style="max-width:700px;">
+  <button class="btn" id="btn-back-consenso" style="margin-bottom:16px;">← Torna alla lista</button>
+
+  <div class="card" style="margin-bottom:20px;">
+    <div style="font-size:0.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:4px;">Paziente</div>
+    <div style="font-size:1.1rem; font-weight:600;">${nome}</div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:0.8rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:12px;">Informativa Privacy e Consenso al Trattamento dei Dati (GDPR)</h3>
+    <div style="font-size:0.88rem; color:var(--txt2); line-height:1.6;">
+      <p style="margin-bottom:10px;"><strong style="color:var(--txt);">TITOLARE DEL TRATTAMENTO</strong><br>
+      [Nome Studio / Struttura Oculistica] — [Indirizzo] — [Email/PEC] <em>(da completare)</em>.</p>
+      <p style="margin-bottom:10px;"><strong style="color:var(--txt);">FINALITÀ E BASE GIURIDICA</strong><br>
+      I Suoi dati personali e sanitari sono trattati per finalità di diagnosi, cura e gestione amministrativa della visita oculistica, ai sensi dell'art. 9(2)(h) GDPR e del D.Lgs. 196/2003 come modificato dal D.Lgs. 101/2018.</p>
+      <p style="margin-bottom:10px;"><strong style="color:var(--txt);">CATEGORIE DI DATI</strong><br>
+      Dati anagrafici, dati di contatto, dati sanitari (referto oculistico, misurazioni visive, diagnosi, prescrizioni).</p>
+      <p style="margin-bottom:10px;"><strong style="color:var(--txt);">CONSERVAZIONE</strong><br>
+      I dati saranno conservati per il periodo minimo previsto dalla normativa sanitaria vigente (minimo 10 anni dalla data della visita).</p>
+      <p style="margin-bottom:10px;"><strong style="color:var(--txt);">DIRITTI DELL'INTERESSATO</strong><br>
+      Lei ha il diritto di accedere, rettificare, cancellare, limitare od opporsi al trattamento dei propri dati, nonché di proporre reclamo al Garante per la Protezione dei Dati Personali (www.garanteprivacy.it).</p>
+      <p><em>Questo testo è un placeholder standard; il titolare deve integrarlo con i propri dati prima dell'uso in produzione.</em></p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px;">
+    <h3 style="font-size:0.8rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:12px;">Firma del paziente</h3>
+    <p style="font-size:0.85rem; color:var(--txt2); margin-bottom:12px;">Firmi nel riquadro sottostante con il dito, lo stilo o il mouse per confermare il consenso.</p>
+    <canvas id="canvas-firma" width="600" height="200"></canvas>
+    <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn" id="btn-cancella-firma">Cancella firma</button>
+      <button class="btn btn-primary" id="btn-conferma-firma" disabled>Conferma e firma</button>
+    </div>
+  </div>
+</div>`;
+
+  const canvas = container.querySelector('#canvas-firma');
+  const firma = initFirmaCanvas(canvas);
+  const btnConferma = container.querySelector('#btn-conferma-firma');
+  const btnCancella = container.querySelector('#btn-cancella-firma');
+
+  // Abilita "Conferma" quando viene tracciata una firma
+  canvas.addEventListener('pointerup', () => {
+    btnConferma.disabled = firma.isEmpty();
+  });
+
+  btnCancella.addEventListener('click', () => {
+    firma.clear();
+    btnConferma.disabled = true;
+  });
+
+  container.querySelector('#btn-back-consenso').addEventListener('click', () => {
+    showView('firma-consenso');
+  });
+
+  btnConferma.addEventListener('click', () => {
+    if (firma.isEmpty()) return;
+    const dataURL = firma.toDataURL();
+    db.updatePaziente(id, { firmaConsenso: dataURL });
+    pushEvento(id, STATI.CONSENSO);
+    // Mostra conferma
+    container.innerHTML = `
+      <div class="conferma-box">
+        <div class="icon">✅</div>
+        <h2>Consenso firmato</h2>
+        <p>Grazie, <strong>${nome}</strong>. Il consenso è stato registrato correttamente.</p>
+        <button class="btn btn-primary" id="btn-torna-lista">Torna alla lista</button>
+      </div>`;
+    container.querySelector('#btn-torna-lista').addEventListener('click', () => {
+      showView('firma-consenso');
+    });
+  });
+}
+
+// ── Renderer: vista firma consenso (kiosk paziente) ───────────────────────────
+registerRenderer('firma-consenso', function() {
+  const container = document.getElementById('view-firma-consenso');
+  // Mostra lista pazienti in stato Refertato
+  const refertati = db.getPazienti().filter(p => p.stato === STATI.REFERTATO);
+
+  if (refertati.length === 0) {
+    container.innerHTML = `
+      <div class="placeholder">
+        <h2>Firma Consenso</h2>
+        <p>Nessun paziente in attesa di firma consenso al momento.</p>
+      </div>`;
+    return;
+  }
+
+  const righe = refertati.map(p => {
+    const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+    return `
+      <div class="board-row" data-id="${p.id}" style="cursor:pointer;">
+        <span class="board-nome">${nome}</span>
+        <span class="badge ambra">${p.stato}</span>
+        <span class="board-azioni">
+          <button class="btn btn-primary" data-id="${p.id}">Firma consenso</button>
+        </span>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div style="max-width:700px;">
+      <h2 style="font-size:1.3rem; font-weight:700; margin-bottom:20px;">Firma consenso</h2>
+      <p style="font-size:0.9rem; color:var(--txt2); margin-bottom:16px;">Seleziona il tuo nominativo per procedere con la firma del consenso al trattamento dei dati.</p>
+      <div class="board-group">
+        <div class="board-group-title">Pazienti pronti per la firma <span class="badge">${refertati.length}</span></div>
+        ${righe}
+      </div>
+    </div>`;
+
+  container.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderConsenso(container, btn.dataset.id);
+    });
   });
 });
 
