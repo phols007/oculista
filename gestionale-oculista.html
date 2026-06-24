@@ -52,6 +52,60 @@
     .view { display: none; }
     .view.active { display: block; }
 
+    /* ── Login view (full screen, covers the shell) ── */
+    #view-login {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      z-index: 300;
+    }
+    #view-login.active {
+      display: flex;
+    }
+    .login-box {
+      background: var(--card);
+      border-radius: var(--r);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border: 1px solid var(--bordo);
+    }
+    .login-box h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .login-box label {
+      font-size: 0.85rem;
+      color: var(--txt2);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .login-box input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--bordo);
+      background: #fff;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: var(--txt);
+      outline: none;
+      transition: border-color .15s;
+    }
+    .login-box input:focus { border-color: var(--txt); }
+    #login-error {
+      color: var(--rosso);
+      font-size: 0.85rem;
+      min-height: 1.2em;
+    }
+
     /* ── Card ── */
     .card {
       background: var(--card);
@@ -168,6 +222,24 @@
       padding: 8px 12px 4px;
     }
 
+    /* ── Sidebar footer (nome utente + Esci) ── */
+    .sidebar-footer {
+      border-top: 1px solid var(--bordo);
+      padding-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .sidebar-footer-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--txt);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     /* ── Placeholder ── */
     .placeholder {
       text-align: center;
@@ -179,26 +251,56 @@
 </head>
 <body>
 
+<!-- Login view (full-screen overlay, outside #app) -->
+<div id="view-login">
+  <div class="login-box">
+    <div>
+      <div style="font-size:2rem; margin-bottom:8px;">👁</div>
+      <h1>Gestionale Oculistico</h1>
+    </div>
+    <form id="login-form" onsubmit="handleLoginSubmit(event)">
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <label for="login-user">Utente</label>
+          <input id="login-user" type="text" autocomplete="username" placeholder="rossi / paziente" required>
+        </div>
+        <div>
+          <label for="login-pass">Password</label>
+          <input id="login-pass" type="password" autocomplete="current-password" placeholder="demo" required>
+        </div>
+        <div id="login-error"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">Accedi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <button id="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">☰</button>
 
 <div id="app">
   <div id="sidebar">
-    <div style="font-size:1.1rem; font-weight:700; padding:4px 12px 16px;">👁 Oculistica</div>
-
-    <div class="sidebar-title">Navigazione</div>
-    <div class="nav-item active" data-view="board">📋 Pazienti</div>
-    <div class="nav-item" data-view="nuovo">➕ Nuovo Paziente</div>
-
-    <div style="flex:1;"></div>
-    <div class="sidebar-title">Sistema</div>
-    <div class="nav-item" data-view="impostazioni">⚙️ Impostazioni</div>
+    <!-- Populated by renderSidebar() -->
   </div>
 
   <div id="main">
-    <div id="view-board" class="view active">
+    <div id="view-board" class="view">
       <div class="placeholder">
-        <h2>Gestionale Oculistico</h2>
-        <p>Scaffold pronto. Board pazienti — in costruzione.</p>
+        <h2>Board Pazienti</h2>
+        <p>Board — in costruzione (Task 3).</p>
+      </div>
+    </div>
+
+    <div id="view-in-attesa" class="view">
+      <div class="placeholder">
+        <h2>In Attesa</h2>
+        <p>Lista pazienti in attesa — in costruzione.</p>
+      </div>
+    </div>
+
+    <div id="view-lista-pazienti" class="view">
+      <div class="placeholder">
+        <h2>Lista Pazienti</h2>
+        <p>Archivio pazienti — in costruzione.</p>
       </div>
     </div>
 
@@ -209,10 +311,24 @@
       </div>
     </div>
 
-    <div id="view-impostazioni" class="view">
+    <div id="view-da-firmare" class="view">
       <div class="placeholder">
-        <h2>Impostazioni</h2>
-        <p>In costruzione.</p>
+        <h2>Referti da Firmare</h2>
+        <p>Coda referti — in costruzione.</p>
+      </div>
+    </div>
+
+    <div id="view-registrazione" class="view">
+      <div class="placeholder">
+        <h2>Registrazione Visita</h2>
+        <p>Modulo registrazione — in costruzione (Task 4).</p>
+      </div>
+    </div>
+
+    <div id="view-firma-consenso" class="view">
+      <div class="placeholder">
+        <h2>Firma Consenso</h2>
+        <p>Firma consenso informato — in costruzione.</p>
       </div>
     </div>
   </div>
@@ -224,6 +340,7 @@
 <script>
 // ── Costanti ──────────────────────────────────────────────────────────────────
 const LS_KEY = 'oculista_pazienti';
+const SS_KEY = 'oculista_user';
 
 const STATI = {
   REGISTRATO: 'Registrato',
@@ -233,6 +350,13 @@ const STATI = {
   REFERTATO:  'Refertato',
   CONSENSO:   'Consenso firmato',
   COMPLETATO: 'Completato'
+};
+
+// ── Utenti ────────────────────────────────────────────────────────────────────
+const UTENTI = {
+  rossi:    { pass: 'demo', ruolo: 'medico',   nome: 'Dott. Rossi' },
+  bianchi:  { pass: 'demo', ruolo: 'medico',   nome: 'Dott. Bianchi' },
+  paziente: { pass: 'demo', ruolo: 'paziente', nome: 'Paziente' }
 };
 
 // ── uuid ──────────────────────────────────────────────────────────────────────
@@ -308,8 +432,26 @@ function nuovoPaziente() {
   };
 }
 
-// ── Session helper (stub — sarà implementato in task login) ───────────────────
-function sessionCorrente() { return null; }
+// ── Session ───────────────────────────────────────────────────────────────────
+function sessionCorrente() {
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function login(user, pass) {
+  const u = UTENTI[user];
+  if (!u || u.pass !== pass) return false;
+  sessionStorage.setItem(SS_KEY, JSON.stringify({ user, ruolo: u.ruolo, nome: u.nome }));
+  render();
+  return true;
+}
+
+function logout() {
+  sessionStorage.removeItem(SS_KEY);
+  render();
+}
 
 // ── pushEvento ────────────────────────────────────────────────────────────────
 function pushEvento(id, stato) {
@@ -323,24 +465,129 @@ function pushEvento(id, stato) {
   return db.updatePaziente(id, { stato, eventi: [...(p.eventi || []), ev] });
 }
 
-// ── Navigazione sidebar ───────────────────────────────────────────────────────
-document.querySelectorAll('[data-view]').forEach(el => {
-  el.addEventListener('click', () => {
-    const target = el.dataset.view;
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.querySelectorAll('[data-view]').forEach(n => n.classList.remove('active'));
-    const viewEl = document.getElementById('view-' + target);
-    if (viewEl) viewEl.classList.add('active');
-    el.classList.add('active');
-    // Chiudi drawer su mobile
-    document.getElementById('sidebar').classList.remove('open');
-  });
-});
+// ── View registry ─────────────────────────────────────────────────────────────
+// Renderers per vista: task successivi sostituiranno quelli placeholder.
+const _viewRenderers = {};
 
-// ── Chiudi sidebar cliccando fuori (mobile) ───────────────────────────────────
-document.getElementById('main').addEventListener('click', () => {
+function registerRenderer(id, fn) {
+  _viewRenderers[id] = fn;
+}
+
+// ── showView ──────────────────────────────────────────────────────────────────
+function showView(id, ctx) {
+  // Toglie active da tutte le .view dentro #main
+  document.querySelectorAll('#main .view').forEach(v => v.classList.remove('active'));
+  // Aggiorna active nella sidebar
+  document.querySelectorAll('#sidebar .nav-item').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === id);
+  });
+  // Mostra la vista richiesta
+  const el = document.getElementById('view-' + id);
+  if (el) el.classList.add('active');
+  // Chiama il renderer se registrato
+  if (_viewRenderers[id]) _viewRenderers[id](ctx);
+  // Chiudi drawer su mobile
   document.getElementById('sidebar').classList.remove('open');
-});
+}
+
+// ── renderSidebar ─────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const sess = sessionCorrente();
+  const sidebar = document.getElementById('sidebar');
+
+  if (!sess) {
+    sidebar.innerHTML = '';
+    return;
+  }
+
+  const logo = `<div style="font-size:1.1rem; font-weight:700; padding:4px 12px 16px;">👁 Oculistica</div>`;
+  let nav = '';
+
+  if (sess.ruolo === 'medico') {
+    nav = `
+      <div class="sidebar-title">Lavoro</div>
+      <div class="nav-item" data-view="board">📋 Board</div>
+      <div class="nav-item" data-view="in-attesa">⏳ In attesa</div>
+
+      <div class="sidebar-title">Pazienti</div>
+      <div class="nav-item" data-view="lista-pazienti">🗂 Lista</div>
+      <div class="nav-item" data-view="nuovo">➕ Nuovo</div>
+
+      <div class="sidebar-title">Referti</div>
+      <div class="nav-item" data-view="da-firmare">✍️ Da firmare</div>
+    `;
+  } else {
+    nav = `
+      <div class="sidebar-title">Percorso</div>
+      <div class="nav-item" data-view="registrazione">📝 Registrazione</div>
+      <div class="nav-item" data-view="firma-consenso">✅ Firma consenso</div>
+    `;
+  }
+
+  const footer = `
+    <div style="flex:1;"></div>
+    <div class="sidebar-footer">
+      <span class="sidebar-footer-name">${sess.nome}</span>
+      <button class="btn btn-danger" style="min-height:36px; padding:0 12px; font-size:0.82rem;" onclick="logout()">Esci</button>
+    </div>
+  `;
+
+  sidebar.innerHTML = logo + nav + footer;
+
+  // Riattacca listener click sulle voci nav
+  sidebar.querySelectorAll('.nav-item[data-view]').forEach(el => {
+    el.addEventListener('click', () => showView(el.dataset.view));
+  });
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function render() {
+  const sess = sessionCorrente();
+  const loginView = document.getElementById('view-login');
+  const app = document.getElementById('app');
+  const hamburger = document.getElementById('hamburger');
+
+  if (!sess) {
+    // Mostra login full-screen, nasconde shell
+    loginView.classList.add('active');
+    app.style.display = 'none';
+    hamburger.style.display = 'none';
+    // Pulisce sidebar
+    renderSidebar();
+    // Svuota errore al ritorno
+    document.getElementById('login-error').textContent = '';
+    return;
+  }
+
+  // Loggato: nasconde login, mostra shell
+  loginView.classList.remove('active');
+  app.style.display = '';
+  // hamburger tornerà visibile via media query (non forzare display qui)
+  hamburger.style.display = '';
+
+  renderSidebar();
+
+  // Instradamento per ruolo
+  if (sess.ruolo === 'medico') {
+    showView('board');
+  } else {
+    showView('registrazione');
+  }
+}
+
+// ── Login form handler ────────────────────────────────────────────────────────
+function handleLoginSubmit(e) {
+  e.preventDefault();
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const ok = login(user, pass);
+  if (!ok) {
+    document.getElementById('login-error').textContent = 'Credenziali non valide. Riprova.';
+  }
+}
+
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
+render();
 </script>
 </body>
 </html>
