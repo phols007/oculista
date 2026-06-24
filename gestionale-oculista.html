@@ -1455,16 +1455,14 @@ function generaPDF(id) {
   const m = p.motivo || {};
   const motivoVoci = [];
   if (m.controllo) motivoVoci.push('Visita di controllo');
-  if (m.disturbi) motivoVoci.push('Disturbi visivi (' + m.disturbi + ')');
+  if (m.disturbi) motivoVoci.push(m.disturbi.trim() ? 'Disturbi visivi (' + m.disturbi.trim() + ')' : 'Disturbi visivi');
   if (m.prescrizione) motivoVoci.push('Prescrizione occhiali/lenti');
-  if (m.altro) motivoVoci.push('Altro (' + m.altro + ')');
+  if (m.altro) motivoVoci.push(m.altro.trim() ? 'Altro (' + m.altro.trim() + ')' : 'Altro');
   section('MOTIVO DELLA VISITA', motivoVoci.length ? motivoVoci : ['Non specificato']);
 
   // ANAMNESI OCULARE E GENERALE
   const n = p.anamnesi || {};
   section('ANAMNESI OCULARE E GENERALE', [
-    'APO - Anamnesi Patologica Oculare: ' + (n.apo || ''),
-    'APG - Anamnesi Patologica Generale: ' + (n.apg || ''),
     'Ha mai avuto problemi agli occhi?: ' + (n.problemiOcchi || ''),
     'Se sì, quali?: ' + (n.qualiProblemi || ''),
     'Porta occhiali o lenti a contatto?: ' + (n.portaOcchiali || ''),
