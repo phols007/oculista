@@ -5,6 +5,7 @@ from tkinter import ttk, messagebox
 from fpdf import FPDF
 import os
 from datetime import date
+from codicefiscale import codicefiscale
 
 class VisitaOculisticaApp:
     def __init__(self, root):
@@ -51,7 +52,8 @@ class VisitaOculisticaApp:
 
         # DATI DEL PAZIENTE
         ttk.Label(self.scrollable_frame, text="DATI DEL PAZIENTE", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=5)
-        self.entry_nome = self.make_labeled_entry("Nome e Cognome:")
+        self.entry_cognome = self.make_labeled_entry("Cognome:")
+        self.entry_nome = self.make_labeled_entry("Nome:")
         self.entry_data_nascita = self.make_labeled_entry("Data di nascita (DD/MM/YYYY):")
         
         self.sesso_var = tk.StringVar()
@@ -62,6 +64,7 @@ class VisitaOculisticaApp:
         frame_sesso.pack(anchor="w", padx=10, pady=5)
 
         self.entry_codice_fiscale = self.make_labeled_entry("Codice Fiscale:")
+        self.entry_comune_nascita = self.make_labeled_entry("Comune di nascita:")
         self.entry_indirizzo = self.make_labeled_entry("Indirizzo:")
         self.entry_telefono = self.make_labeled_entry("Telefono:")
         self.entry_email = self.make_labeled_entry("Email:")
@@ -89,6 +92,14 @@ class VisitaOculisticaApp:
 
         # ANAMNESI OCULARE E GENERALE
         ttk.Label(self.scrollable_frame, text="ANAMNESI OCULARE E GENERALE", font=("Arial", 14, "bold")).pack(anchor="w", padx=10, pady=10)
+
+        ttk.Label(self.scrollable_frame, text="APO - Anamnesi Patologica Oculare:").pack(anchor="w", padx=20)
+        self.text_apo = tk.Text(self.scrollable_frame, height=4, width=60)
+        self.text_apo.pack(padx=20, pady=5)
+
+        ttk.Label(self.scrollable_frame, text="APG - Anamnesi Patologica Generale:").pack(anchor="w", padx=20)
+        self.text_apg = tk.Text(self.scrollable_frame, height=4, width=60)
+        self.text_apg.pack(padx=20, pady=5)
 
         self.anamnesi_problemi_occhi = tk.StringVar(value="No")
         frame_problemi_occhi = ttk.Frame(self.scrollable_frame)
@@ -119,6 +130,9 @@ class VisitaOculisticaApp:
         self.text_annessi = tk.Text(self.scrollable_frame, height=4, width=60)
         self.text_annessi.pack(padx=20, pady=5)
 
+        self.entry_visus_od = self.make_labeled_entry("Visus OD:")
+        self.entry_visus_os = self.make_labeled_entry("Visus OS:")
+
         self.entry_acuita_lontano_od = self.make_labeled_entry("Acuità Visiva per Lontano OD:")
         self.entry_acuita_lontano_os = self.make_labeled_entry("Acuità Visiva per Lontano OS:")
 
@@ -138,9 +152,16 @@ class VisitaOculisticaApp:
         self.entry_pressione_od = self.make_labeled_entry("Pressione Intraoculare OD (mmHg):")
         self.entry_pressione_os = self.make_labeled_entry("Pressione Intraoculare OS (mmHg):")
 
-        ttk.Label(self.scrollable_frame, text="Esame del Fondo Oculare:").pack(anchor="w", padx=20)
-        self.text_fondo = tk.Text(self.scrollable_frame, height=4, width=60)
-        self.text_fondo.pack(padx=20, pady=5)
+        self.entry_tono_od = self.make_labeled_entry("Tono OD (mmHg):")
+        self.entry_tono_os = self.make_labeled_entry("Tono OS (mmHg):")
+
+        ttk.Label(self.scrollable_frame, text="Fundus OD (Fondo Oculare):").pack(anchor="w", padx=20)
+        self.text_fundus_od = tk.Text(self.scrollable_frame, height=4, width=60)
+        self.text_fundus_od.pack(padx=20, pady=5)
+
+        ttk.Label(self.scrollable_frame, text="Fundus OS (Fondo Oculare):").pack(anchor="w", padx=20)
+        self.text_fundus_os = tk.Text(self.scrollable_frame, height=4, width=60)
+        self.text_fundus_os.pack(padx=20, pady=5)
 
         ttk.Label(self.scrollable_frame, text="Altri Esami:").pack(anchor="w", padx=20)
         self.text_altri_esami = tk.Text(self.scrollable_frame, height=3, width=60)
@@ -166,10 +187,12 @@ class VisitaOculisticaApp:
 
     def genera_pdf(self):
         # Raccolta dati
-        nome = self.entry_nome.get()
-        data_nascita = self.entry_data_nascita.get()
+        cognome = self.entry_cognome.get().strip()
+        nome = self.entry_nome.get().strip()
+        data_nascita = self.entry_data_nascita.get().strip()
         sesso = self.sesso_var.get()
-        codice_fiscale = self.entry_codice_fiscale.get()
+        codice_fiscale = self.entry_codice_fiscale.get().strip().upper()
+        comune_nascita = self.entry_comune_nascita.get().strip()
         indirizzo = self.entry_indirizzo.get()
         telefono = self.entry_telefono.get()
         email = self.entry_email.get()
@@ -191,8 +214,12 @@ class VisitaOculisticaApp:
         malattie = self.entry_malattie.get()
         farmaci = self.entry_farmaci.get()
         interventi = self.entry_interventi.get()
+        apo = self.text_apo.get("1.0", "end").strip()
+        apg = self.text_apg.get("1.0", "end").strip()
 
         annessi = self.text_annessi.get("1.0", "end").strip()
+        visus_od = self.entry_visus_od.get()
+        visus_os = self.entry_visus_os.get()
         acuita_lontano_od = self.entry_acuita_lontano_od.get()
         acuita_lontano_os = self.entry_acuita_lontano_os.get()
         acuita_vicino_od = self.entry_acuita_vicino_od.get()
@@ -205,13 +232,40 @@ class VisitaOculisticaApp:
         asse_os = self.entry_asse_os.get()
         pressione_od = self.entry_pressione_od.get()
         pressione_os = self.entry_pressione_os.get()
-        fondo = self.text_fondo.get("1.0", "end").strip()
+        tono_od = self.entry_tono_od.get()
+        tono_os = self.entry_tono_os.get()
+        fundus_od = self.text_fundus_od.get("1.0", "end").strip()
+        fundus_os = self.text_fundus_os.get("1.0", "end").strip()
         altri_esami = self.text_altri_esami.get("1.0", "end").strip()
         diagnosi = self.text_diagnosi.get("1.0", "end").strip()
 
-        if not nome or not data_nascita:
-            messagebox.showerror("Errore", "Compila almeno Nome e Data di nascita.")
+        if not cognome or not nome or not data_nascita:
+            messagebox.showerror("Errore", "Compila almeno Cognome, Nome e Data di nascita.")
             return
+
+        # Verifica coerenza Codice Fiscale con i dati anagrafici
+        if codice_fiscale:
+            if not sesso or not comune_nascita:
+                messagebox.showerror("Errore", "Per verificare il Codice Fiscale servono Sesso e Comune di nascita.")
+                return
+            try:
+                cf_atteso = codicefiscale.encode(
+                    lastname=cognome,
+                    firstname=nome,
+                    gender=sesso,
+                    birthdate=data_nascita,
+                    birthplace=comune_nascita,
+                ).upper()
+            except Exception as e:
+                messagebox.showerror("Errore", f"Impossibile calcolare il Codice Fiscale.\nControlla Comune di nascita e Data di nascita.\n\n{e}")
+                return
+            if codice_fiscale != cf_atteso:
+                messagebox.showerror(
+                    "Codice Fiscale non valido",
+                    f"Il Codice Fiscale inserito non corrisponde ai dati anagrafici.\n\n"
+                    f"Inserito: {codice_fiscale}\nAtteso:  {cf_atteso}",
+                )
+                return
 
         # Creazione PDF
         pdf = FPDF()
@@ -232,9 +286,11 @@ class VisitaOculisticaApp:
             pdf.ln(5)
 
         write_section("DATI DEL PAZIENTE", [
-            f"Nome e Cognome: {nome}",
+            f"Cognome: {cognome}",
+            f"Nome: {nome}",
             f"Data di nascita: {data_nascita}",
             f"Sesso: {sesso}",
+            f"Comune di nascita: {comune_nascita}",
             f"Codice Fiscale: {codice_fiscale}",
             f"Indirizzo: {indirizzo}",
             f"Telefono: {telefono}",
@@ -244,6 +300,8 @@ class VisitaOculisticaApp:
         write_section("MOTIVO DELLA VISITA", motivo if motivo else "Non specificato")
 
         write_section("ANAMNESI OCULARE E GENERALE", [
+            f"APO - Anamnesi Patologica Oculare:\n{apo}",
+            f"APG - Anamnesi Patologica Generale:\n{apg}",
             f"Ha mai avuto problemi agli occhi?: {anamnesi_problemi}",
             f"Se sì, quali?: {quali_problemi}",
             f"Porta occhiali o lenti a contatto?: {porta_occhiali}",
@@ -255,6 +313,8 @@ class VisitaOculisticaApp:
 
         write_section("ESAME OBIETTIVO OCULARE", [
             f"Esame Annessi e Segmento Anteriore:\n{annessi}",
+            f"Visus OD: {visus_od}",
+            f"Visus OS: {visus_os}",
             f"Acuità Visiva per Lontano OD: {acuita_lontano_od}",
             f"Acuità Visiva per Lontano OS: {acuita_lontano_os}",
             f"Acuità Visiva per Vicino OD: {acuita_vicino_od}",
@@ -263,13 +323,16 @@ class VisitaOculisticaApp:
             f"Refrazione OS: Sph {sph_os} Cyl {cyl_os} Asse {asse_os}",
             f"Pressione Intraoculare OD: {pressione_od} mmHg",
             f"Pressione Intraoculare OS: {pressione_os} mmHg",
-            f"Esame del Fondo Oculare:\n{fondo}",
+            f"Tono OD: {tono_od} mmHg",
+            f"Tono OS: {tono_os} mmHg",
+            f"Fundus OD:\n{fundus_od}",
+            f"Fundus OS:\n{fundus_os}",
             f"Altri Esami:\n{altri_esami}"
         ])
 
         write_section("DIAGNOSI E PRESCRIZIONE", diagnosi)
 
-        nome_file = f"{nome.replace(' ', '_')}_{date.today()}.pdf"
+        nome_file = f"{cognome}_{nome}_{date.today()}.pdf".replace(' ', '_')
         cartella_destinazione = os.path.expanduser("~/Desktop/RefertiOculistici")
         os.makedirs(cartella_destinazione, exist_ok=True)
         percorso_file = os.path.join(cartella_destinazione, nome_file)
