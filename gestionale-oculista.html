@@ -377,6 +377,10 @@
     <div id="view-dettaglio" class="view">
       <!-- Populated by apriDettaglio / prendiInCarico fallback -->
     </div>
+
+    <div id="view-referto" class="view">
+      <!-- Populated by renderReferto -->
+    </div>
   </div>
 </div>
 
@@ -939,9 +943,11 @@ function renderBoard(container, filtroSoloAttesa) {
     if (isAttesa) {
       azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); prendiInCarico('${p.id}')">Prendi in carico</button>`;
     } else if (isInCorso) {
-      azioni = `<button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_STOP}')">In stop</button>`;
+      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>
+                <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_STOP}')">In stop</button>`;
     } else if (isInStop) {
-      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
+      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>
+                <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
     }
 
     return `
@@ -1012,6 +1018,192 @@ function apriDettaglio(id) {
       showView('board');
     }
   });
+}
+
+// ── apriReferto ───────────────────────────────────────────────────────────────
+function apriReferto(id) {
+  renderReferto(document.getElementById('view-referto'), id);
+  showView('referto');
+}
+
+// ── renderReferto ─────────────────────────────────────────────────────────────
+function renderReferto(container, id) {
+  const p = db.getPaziente(id);
+  if (!p) { container.innerHTML = '<p>Paziente non trovato.</p>'; return; }
+
+  const r = p.referto || {};
+  const od = r.refOD || {};
+  const os = r.refOS || {};
+
+  function inp(field, value, placeholder) {
+    const v = (value || '').toString().replace(/"/g, '&quot;');
+    return `<input type="text" data-field="${field}" value="${v}" placeholder="${placeholder || ''}">`;
+  }
+  function ta(field, value, placeholder) {
+    const v = (value || '').toString().replace(/</g, '&lt;');
+    return `<textarea data-field="${field}" placeholder="${placeholder || ''}">${v}</textarea>`;
+  }
+
+  container.innerHTML = `
+<div style="max-width:720px;">
+  <button class="btn" id="btn-back-referto" style="margin-bottom:16px;">← Torna alla board</button>
+
+  <div class="card" style="margin-bottom:24px;">
+    <div style="font-size:0.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:4px;">Paziente</div>
+    <div style="font-size:1.1rem; font-weight:600;">${(p.anagrafica && p.anagrafica.nome) || '(senza nome)'}</div>
+  </div>
+
+  <form id="form-referto" autocomplete="off">
+
+    <!-- Esame Annessi e Segmento Anteriore -->
+    <div class="form-section">
+      <h3>Esame Annessi e Segmento Anteriore</h3>
+      <div class="form-field">
+        <label>Esame Annessi e Segmento Anteriore</label>
+        ${ta('referto.annessi', r.annessi, 'Descrivi...')}
+      </div>
+    </div>
+
+    <!-- Acuità Visiva -->
+    <div class="form-section">
+      <h3>Acuità Visiva</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Per Lontano — OD</label>
+          ${inp('referto.acuitaLontanoOD', r.acuitaLontanoOD, 'Es. 10/10')}
+        </div>
+        <div class="form-field">
+          <label>Per Lontano — OS</label>
+          ${inp('referto.acuitaLontanoOS', r.acuitaLontanoOS, 'Es. 10/10')}
+        </div>
+        <div class="form-field">
+          <label>Per Vicino — OD</label>
+          ${inp('referto.acuitaVicinoOD', r.acuitaVicinoOD, 'Es. 10/10')}
+        </div>
+        <div class="form-field">
+          <label>Per Vicino — OS</label>
+          ${inp('referto.acuitaVicinoOS', r.acuitaVicinoOS, 'Es. 10/10')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Refrazione -->
+    <div class="form-section">
+      <h3>Refrazione</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>OD — Sph</label>
+          ${inp('referto.refOD.sph', od.sph, 'Es. -1.50')}
+        </div>
+        <div class="form-field">
+          <label>OD — Cyl</label>
+          ${inp('referto.refOD.cyl', od.cyl, 'Es. -0.50')}
+        </div>
+        <div class="form-field">
+          <label>OD — Asse</label>
+          ${inp('referto.refOD.asse', od.asse, 'Es. 90')}
+        </div>
+        <div class="form-field" style="grid-column:1/-1; border-top:1px solid var(--bordo); padding-top:12px; margin-top:4px;"></div>
+        <div class="form-field">
+          <label>OS — Sph</label>
+          ${inp('referto.refOS.sph', os.sph, 'Es. -1.50')}
+        </div>
+        <div class="form-field">
+          <label>OS — Cyl</label>
+          ${inp('referto.refOS.cyl', os.cyl, 'Es. -0.50')}
+        </div>
+        <div class="form-field">
+          <label>OS — Asse</label>
+          ${inp('referto.refOS.asse', os.asse, 'Es. 90')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Pressione Intraoculare -->
+    <div class="form-section">
+      <h3>Pressione Intraoculare</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>OD (mmHg)</label>
+          ${inp('referto.pressioneOD', r.pressioneOD, 'Es. 14')}
+        </div>
+        <div class="form-field">
+          <label>OS (mmHg)</label>
+          ${inp('referto.pressioneOS', r.pressioneOS, 'Es. 14')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Esame del Fondo Oculare -->
+    <div class="form-section">
+      <h3>Esame del Fondo Oculare</h3>
+      <div class="form-field">
+        <label>Esame del Fondo Oculare</label>
+        ${ta('referto.fondo', r.fondo, 'Descrivi...')}
+      </div>
+    </div>
+
+    <!-- Altri Esami -->
+    <div class="form-section">
+      <h3>Altri Esami</h3>
+      <div class="form-field">
+        <label>Altri Esami</label>
+        ${ta('referto.altriEsami', r.altriEsami, 'Descrivi...')}
+      </div>
+    </div>
+
+    <!-- Diagnosi e Prescrizione -->
+    <div class="form-section">
+      <h3>Diagnosi e Prescrizione</h3>
+      <div class="form-field">
+        <label>Diagnosi e prescrizione</label>
+        ${ta('referto.diagnosi', r.diagnosi, 'Es. Miopia lieve OD...')}
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">Salva referto</button>
+  </form>
+</div>`;
+
+  container.querySelector('#btn-back-referto').addEventListener('click', () => showView('board'));
+
+  container.querySelector('#form-referto').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const referto = leggiRefertoDalForm(container);
+    db.updatePaziente(id, { referto });
+    pushEvento(id, STATI.REFERTATO);
+    showView('board');
+  });
+}
+
+// ── leggiRefertoDalForm ───────────────────────────────────────────────────────
+function leggiRefertoDalForm(container) {
+  function val(field) {
+    const el = container.querySelector(`[data-field="${field}"]`);
+    return el ? el.value : '';
+  }
+  return {
+    annessi:         val('referto.annessi'),
+    acuitaLontanoOD: val('referto.acuitaLontanoOD'),
+    acuitaLontanoOS: val('referto.acuitaLontanoOS'),
+    acuitaVicinoOD:  val('referto.acuitaVicinoOD'),
+    acuitaVicinoOS:  val('referto.acuitaVicinoOS'),
+    refOD: {
+      sph:  val('referto.refOD.sph'),
+      cyl:  val('referto.refOD.cyl'),
+      asse: val('referto.refOD.asse')
+    },
+    refOS: {
+      sph:  val('referto.refOS.sph'),
+      cyl:  val('referto.refOS.cyl'),
+      asse: val('referto.refOS.asse')
+    },
+    pressioneOD: val('referto.pressioneOD'),
+    pressioneOS: val('referto.pressioneOS'),
+    fondo:       val('referto.fondo'),
+    altriEsami:  val('referto.altriEsami'),
+    diagnosi:    val('referto.diagnosi')
+  };
 }
 
 // ── Registra renderer board e attesa ─────────────────────────────────────────
