@@ -353,6 +353,90 @@ Annotare checkpoint.
 
 ---
 
+### Task 9: Cronometro pazienti in stop (tempo in pausa)
+
+**Files:**
+- Modify: `oculista/gestionale-oculista.html`
+
+**Interfaces:**
+- Consumes: `db`, `STATI`, `eventi[]` (già popolato da `pushEvento`), `renderBoard`, `renderDettaglio` (Task 8), `showView`.
+- Produces:
+  - `inizioStop(p) -> ISO|null` — ritorna il `ts` dell'ULTIMO evento con `stato === STATI.IN_STOP` in `p.eventi` (null se non in stop o nessun evento).
+  - `formatDurata(ms) -> string` — `"Hh Mm"` se ≥1h, altrimenti `"Mm Ss"` (zero-pad sec). Es. `"7m 03s"`, `"1h 12m"`.
+  - `avviaCronometri()` / `fermaCronometri()` — un singolo `setInterval(…,1000)` che ad ogni tick aggiorna il testo di tutti gli elementi `[data-stop-since]` con `formatDurata(now - ts)`. `fermaCronometri` fa `clearInterval` e azzera l'id. Evita interval multipli (idempotente).
+- Le righe board "In stop" e la card dettaglio in stop renderizzano `<span class="crono" data-stop-since="<ISO>">…</span>` con etichetta "In pausa da ". `showView` chiama `fermaCronometri()` all'uscita e `renderBoard`/`renderDettaglio` chiamano `avviaCronometri()` dopo aver disegnato (solo se ci sono elementi `[data-stop-since]`).
+
+- [ ] **Step 1: Implementare `inizioStop`, `formatDurata`, `avviaCronometri`/`fermaCronometri`**
+
+`inizioStop`: itera `p.eventi` dal fondo, ritorna il primo `ts` con `stato===STATI.IN_STOP`. `formatDurata`: da ms a stringa. `avviaCronometri`: se `cronoInterval` già attivo, return; altrimenti `cronoInterval=setInterval(tick,1000)` dove `tick` fa `document.querySelectorAll('[data-stop-since]').forEach(el=>el.textContent=formatDurata(Date.now()-Date.parse(el.dataset.stopSince)))` e chiama subito `tick()` una volta. `fermaCronometri`: `clearInterval(cronoInterval); cronoInterval=null;`.
+
+- [ ] **Step 2: Integrare nelle viste**
+
+In `renderBoard` (riga gruppo "In stop") e in `renderDettaglio` (card stato, se `stato===IN_STOP`): aggiungere `In pausa da <span class="crono" data-stop-since="${inizioStop(p)}"></span>`. Dopo il render, se esiste almeno un `[data-stop-since]`, chiamare `avviaCronometri()`. In `showView` chiamare `fermaCronometri()` prima di cambiare vista (evita interval orfani). Stile `.crono`: riusa token (monospace opzionale, `var(--ambra-txt)`).
+
+- [ ] **Step 3: Verifica cronometro**
+
+Su :8080: metti Anna "In stop", apri la board → compare "In pausa da 0m 0Xs" che incrementa ogni secondo. `preview_eval`: `inizioStop(db.getPaziente('<id>'))` ritorna l'ISO dell'ultimo evento In stop; `formatDurata(3723000)==='1h 02m'`. Cambia vista e torna → un solo interval attivo (nessun raddoppio di velocità). Riprendi Anna (In corso) → il cronometro sparisce.
+
+- [ ] **Step 4: Checkpoint**
+
+Annotare checkpoint.
+
+---
+
+## Allineamento referto esteso (delta `.py` aggiornata)
+
+La `.py` di riferimento è stata estesa. Allineare **SOLO i campi variati**, modifica chirurgica, senza toccare i campi esistenti che non cambiano.
+
+**Delta campi:**
+- Anagrafica: `nome` → split in `cognome` + `nome`; nuovo `comuneNascita`; validazione Codice Fiscale.
+- Clinica (lato medico): nuovi `apo` (Anamnesi Patologica Oculare), `apg` (Anamnesi Patologica Generale).
+- Esame obiettivo: nuovi `visusOD`/`visusOS`, `tonoOD`/`tonoOS`; `fondo` sostituito da `fundusOD`/`fundusOS`.
+
+**Posizionamento:** APO/APG sono anamnesi clinica → vanno nel form REFERTAZIONE (medico), non nella registrazione self-service del paziente. Visus/Tono/Fundus → referto. Cognome/Comune nascita → anagrafica.
+
+### Task 10: Anagrafica — split Cognome/Nome + Comune nascita + validazione CF
+
+**Files:** Modify `oculista/gestionale-oculista.html`
+
+**Interfaces:**
+- Schema `anagrafica`: aggiungere `cognome:''` e `comuneNascita:''` (mantenere `nome`). Aggiornare `nuovoPaziente()`.
+- `renderAnagrafica`/`leggiAnagraficaDalForm`: aggiungere campo **Cognome** (prima di Nome) e **Comune di nascita** (dopo Codice Fiscale). `data-field="anagrafica.cognome"`, `anagrafica.comuneNascita`.
+- `nomeCompleto(p) -> string` → `"<cognome> <nome>"` (trim). Sostituire gli usi di `p.anagrafica.nome` per la visualizzazione del nominativo in board/PDF/liste con `nomeCompleto(p)` (SOLO display; non rinominare la chiave `nome`).
+- `validaCodiceFiscale(anagrafica) -> {ok:boolean, atteso?:string, msg?:string}` — algoritmo CF italiano in JS: calcola codice cognome (consonanti/vocali), codice nome, codice data+sesso (anno 2 cifre, mese lettera, giorno +40 se F), e **carattere di controllo** (checksum). Confronta i 15 char calcolabili + checksum col CF inserito. **Il codice Belfiore del comune (4 char, pos. 12-15) NON è cross-validato** (richiederebbe la tabella catastale ~8000 comuni, fuori scope per il prototipo single-file): si verifica formato+checksum+cognome+nome+data+sesso. Validazione attiva al submit registrazione: obbligatori Cognome, Nome, Data nascita; se CF compilato → verifica e blocca con messaggio se incoerente.
+
+- [ ] **Step 1:** Aggiungere `cognome`/`comuneNascita` a `nuovoPaziente().anagrafica`. Implementare `nomeCompleto` e `validaCodiceFiscale` (con tabella mesi `ABCDEHLMPRST`, set vocali, funzione checksum con le tabelle pari/dispari standard).
+- [ ] **Step 2:** Aggiungere i due campi in `renderAnagrafica` (Cognome prima di Nome; Comune di nascita dopo CF) e in `leggiAnagraficaDalForm`. Sostituire i display del nominativo con `nomeCompleto`. Cablare `validaCodiceFiscale` nella validazione submit della registrazione.
+- [ ] **Step 3: Verifica browser** — registra "Rossi"/"Mario", data, sesso M, CF coerente → passa; CF errato → messaggio "non corrisponde"; CF vuoto → consentito. `preview_eval`: `nomeCompleto(p)==='Rossi Mario'`; `validaCodiceFiscale` ritorna `ok:false` su CF con checksum errato.
+- [ ] **Step 4: Checkpoint.**
+
+### Task 11: Referto — Visus/Tono/Fundus + APO/APG
+
+**Files:** Modify `oculista/gestionale-oculista.html`
+
+**Interfaces:**
+- Schema `referto`: aggiungere `apo:''`, `apg:''`, `visusOD:''`, `visusOS:''`, `tonoOD:''`, `tonoOS:''`, `fundusOD:''`, `fundusOS:''`; **rimuovere `fondo`** (sostituito da fundusOD/OS). Aggiornare `nuovoPaziente()`.
+- `renderReferto`/`leggiRefertoDalForm`: aggiungere — in testa "ANAMNESI CLINICA": APO (textarea), APG (textarea); in ESAME: Visus OD/OS (dopo annessi, prima dell'acuità), Tono OD/OS (mmHg, vicino a Pressione), Fundus OD/OS (textarea, al posto di Fondo). `data-field` `referto.apo` ecc.
+- Mantenere INTATTI i campi referto esistenti non variati (annessi, acuità lontano/vicino, refOD/refOS, pressioneOD/OS, altriEsami, diagnosi).
+
+- [ ] **Step 1:** Aggiornare schema `referto` in `nuovoPaziente()` (aggiungere gli 8 campi, rimuovere `fondo`).
+- [ ] **Step 2:** Aggiungere i campi in `renderReferto` e `leggiRefertoDalForm` nelle posizioni indicate; sostituire il blocco "Fondo Oculare" con Fundus OD/OS.
+- [ ] **Step 3: Verifica browser** — compila Visus OD="10/10", Tono OD="15", Fundus OD="nella norma", APO="-" → salva → `preview_eval` conferma i campi salvati in `db.getPaziente(id).referto` e assenza di `fondo`.
+- [ ] **Step 4: Checkpoint.**
+
+### Task 12: PDF — sincronizzare i campi nuovi (ordine `.py`)
+
+**Files:** Modify `oculista/gestionale-oculista.html`
+
+**Interfaces:**
+- `generaPDF(id)`: allineare 1:1 alla `genera_pdf()` nuova — DATI PAZIENTE: `Cognome:` + `Nome:` separati, `Comune di nascita:` dopo Sesso; ANAMNESI: aggiungere righe APO/APG (ora con dati reali dallo schema); ESAME OBIETTIVO: Visus OD/OS, Tono OD/OS, Fundus OD/OS (al posto di "Esame del Fondo Oculare"). Mantenere ordine e le righe esistenti non variate.
+
+- [ ] **Step 1:** Aggiornare le sezioni di `generaPDF` per i soli campi variati (Cognome/Nome/Comune, APO/APG, Visus/Tono/Fundus OD/OS), usando `nomeCompleto` per il filename.
+- [ ] **Step 2: Verifica browser** — `generaPDF` su paziente completo produce PDF con i nuovi campi popolati, niente `fondo`, niente righe vuote.
+- [ ] **Step 3: Checkpoint.**
+
+---
+
 ## Self-Review
 
 - **Spec coverage:** Architettura/db+eventi (T1), login+ruoli+shell sidebar (T2), registrazione anagrafica + conferma medico (T3), stati+board In corso⇄In stop (T4), refertazione (T5), consenso+firma (T6), PDF con firma (T7), vista dettaglio a card + timeline stato — stile Demo Laboratorio (T8). Tutte le sezioni dello spec (incl. UI/UX) coperte.
