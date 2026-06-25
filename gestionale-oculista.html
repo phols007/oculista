@@ -305,6 +305,13 @@
       display: block;
       max-width: 100%;
     }
+
+    /* ── Cronometro pausa ── */
+    .crono {
+      font-family: ui-monospace, 'Courier New', monospace;
+      color: var(--ambra-txt);
+      font-size: 0.85em;
+    }
   </style>
 </head>
 <body>
@@ -627,6 +634,42 @@ function pushEvento(id, stato) {
   return db.updatePaziente(id, { stato, eventi: [...(p.eventi || []), ev] });
 }
 
+// ── Cronometro pausa ──────────────────────────────────────────────────────────
+function inizioStop(p) {
+  if (!p || !p.eventi || !p.eventi.length) return null;
+  for (let i = p.eventi.length - 1; i >= 0; i--) {
+    if (p.eventi[i].stato === STATI.IN_STOP) return p.eventi[i].ts;
+  }
+  return null;
+}
+
+function formatDurata(ms) {
+  const totSec = Math.floor(ms / 1000);
+  const h = Math.floor(totSec / 3600);
+  const m = Math.floor((totSec % 3600) / 60);
+  const s = totSec % 60;
+  if (h >= 1) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}m ${String(s).padStart(2, '0')}s`;
+}
+
+let cronoInterval = null;
+
+function avviaCronometri() {
+  if (cronoInterval) return;
+  function tick() {
+    document.querySelectorAll('[data-stop-since]').forEach(el => {
+      el.textContent = formatDurata(Date.now() - Date.parse(el.dataset.stopSince));
+    });
+  }
+  tick();
+  cronoInterval = setInterval(tick, 1000);
+}
+
+function fermaCronometri() {
+  clearInterval(cronoInterval);
+  cronoInterval = null;
+}
+
 // ── View registry ─────────────────────────────────────────────────────────────
 // Renderers per vista: task successivi sostituiranno quelli placeholder.
 const _viewRenderers = {};
@@ -637,6 +680,8 @@ function registerRenderer(id, fn) {
 
 // ── showView ──────────────────────────────────────────────────────────────────
 function showView(id, ctx) {
+  // Ferma cronometri orfani prima di cambiare vista
+  fermaCronometri();
   // Toglie active da tutte le .view dentro #main
   document.querySelectorAll('#main .view').forEach(v => v.classList.remove('active'));
   // Aggiorna active nella sidebar
@@ -1166,6 +1211,7 @@ function renderDettaglio(container, id) {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
         <h1 style="font-size:1.5rem;font-weight:700;">#${id}</h1>
         ${badgeStato(stato)}
+        ${isInStop ? `<span style="font-size:0.85rem;color:var(--txt2);">In pausa da <span class="crono" data-stop-since="${inizioStop(p)}"></span></span>` : ''}
       </div>
       <div style="font-size:0.82rem;color:var(--txt2);margin-bottom:24px;">
         <span style="cursor:pointer;" id="det-bread-home">Home</span>
@@ -1286,6 +1332,7 @@ function renderDettaglio(container, id) {
   const btnRiprendi = container.querySelector('#det-btn-riprendi');
   if (btnRiprendi) {
     btnRiprendi.onclick = () => {
+      fermaCronometri();
       pushEvento(id, STATI.IN_CORSO);
       renderDettaglio(container, id);
     };
@@ -1303,6 +1350,9 @@ function renderDettaglio(container, id) {
       renderDettaglio(container, id);
     };
   }
+
+  // Avvia cronometro se paziente in pausa
+  if (container.querySelector('[data-stop-since]')) avviaCronometri();
 }
 
 // ── prendiInCarico ────────────────────────────────────────────────────────────
@@ -1367,9 +1417,13 @@ function renderBoard(container, filtroSoloAttesa) {
       }
     }
 
+    const cronoHtml = isInStop
+      ? ` <span style="font-size:0.82rem;color:var(--txt2);">In pausa da <span class="crono" data-stop-since="${inizioStop(p)}"></span></span>`
+      : '';
+
     return `
       <div class="board-row" onclick="apriDettaglio('${p.id}')" title="Apri dettaglio">
-        <span class="board-nome">${nome}</span>
+        <span class="board-nome">${nome}${cronoHtml}</span>
         ${badgeStato(p.stato)}
         <span class="board-azioni">${azioni}</span>
       </div>`;
@@ -1403,6 +1457,9 @@ function renderBoard(container, filtroSoloAttesa) {
   } else {
     container.innerHTML = html;
   }
+
+  // Avvia cronometri se ci sono pazienti in pausa
+  if (container.querySelector('[data-stop-since]')) avviaCronometri();
 }
 
 // ── apriDettaglio ─────────────────────────────────────────────────────────────
@@ -1410,6 +1467,8 @@ function apriDettaglio(id) {
   if (typeof renderDettaglio === 'function') {
     renderDettaglio(document.getElementById('view-dettaglio'), id);
     showView('dettaglio');
+    // avvia cronometri DOPO showView (che li ferma) se il paziente è in stop
+    if (document.querySelector('#view-dettaglio [data-stop-since]')) avviaCronometri();
     return;
   }
   // Fallback: anagrafica confermabile nel view-dettaglio
