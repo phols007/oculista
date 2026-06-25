@@ -16,6 +16,9 @@
       --rosso:   #ff3b30;
       --bordo:   #d2d2d7;
       --r:       14px;
+      --blu:     #0071e3;
+      --viola:   #8b5cf6;
+      --verde-pieno: #1a8a3c;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -124,9 +127,12 @@
       color: var(--txt2);
       border: 1px solid var(--bordo);
     }
-    .badge.ambra  { background: var(--ambra);  color: var(--ambra-txt); border-color: transparent; }
-    .badge.verde  { background: var(--verde);   color: #fff;             border-color: transparent; }
-    .badge.rosso  { background: var(--rosso);   color: #fff;             border-color: transparent; }
+    .badge.ambra       { background: var(--ambra);       color: var(--ambra-txt); border-color: transparent; }
+    .badge.verde       { background: var(--verde);       color: #fff;             border-color: transparent; }
+    .badge.rosso       { background: var(--rosso);       color: #fff;             border-color: transparent; }
+    .badge.blu         { background: var(--blu);         color: #fff;             border-color: transparent; }
+    .badge.viola       { background: var(--viola);       color: #fff;             border-color: transparent; }
+    .badge.verde-pieno { background: var(--verde-pieno); color: #fff;             border-color: transparent; }
 
     /* ── Bottoni ── */
     .btn {
@@ -1016,9 +1022,12 @@ function leggiAnagraficaDalForm(container) {
 
 // ── Board: badge colore per stato ────────────────────────────────────────────
 function badgeStato(stato) {
-  const cls = stato === STATI.IN_CORSO ? 'verde'
-             : stato === STATI.IN_STOP  ? 'rosso'
-             : 'ambra';
+  const cls = stato === STATI.IN_CORSO    ? 'verde'
+             : stato === STATI.IN_STOP    ? 'ambra'
+             : stato === STATI.REFERTATO  ? 'blu'
+             : stato === STATI.CONSENSO   ? 'viola'
+             : stato === STATI.COMPLETATO ? 'verde-pieno'
+             : '';          // Registrato / In attesa → grigio default
   return `<span class="badge ${cls}">${stato}</span>`;
 }
 
@@ -1026,6 +1035,274 @@ function badgeStato(stato) {
 function setStato(id, stato) {
   pushEvento(id, stato);
   showView('board');
+}
+
+// ── renderTimeline ────────────────────────────────────────────────────────────
+function renderTimeline(eventi) {
+  if (!eventi || eventi.length === 0) {
+    return '<p style="color:var(--txt2);font-size:0.85rem;">Nessun evento registrato.</p>';
+  }
+  const items = eventi.map((ev, i) => {
+    const isCurrent = i === eventi.length - 1;
+    const cls = isCurrent ? 'current' : 'done';
+    const data = new Date(ev.ts).toLocaleString('it-IT');
+    return `<li class="${cls}">${ev.stato} &mdash; ${data} &mdash; ${ev.utente}</li>`;
+  }).join('');
+  return `<ul class="timeline">${items}</ul>`;
+}
+
+// ── renderDettaglio ───────────────────────────────────────────────────────────
+function renderDettaglio(container, id) {
+  const p = db.getPaziente(id);
+  if (!p) {
+    container.innerHTML = '<div class="placeholder"><h2>Paziente non trovato.</h2></div>';
+    return;
+  }
+
+  const a   = p.anagrafica || {};
+  const m   = p.motivo     || {};
+  const an  = p.anamnesi   || {};
+  const r   = p.referto    || {};
+  const od  = r.refOD      || {};
+  const os  = r.refOS      || {};
+  const nome = nomeCompleto(p) || '(senza nome)';
+
+  // Helper per una riga di campo read-only
+  function campo(label, val) {
+    if (!val && val !== 0) return '';
+    return `<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:10px;">
+      <span style="font-size:0.78rem;color:var(--txt2);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">${label}</span>
+      <span style="font-size:0.9rem;color:var(--txt);">${val}</span>
+    </div>`;
+  }
+
+  // Motivo visita
+  const motivoVoci = [];
+  if (m.controllo) motivoVoci.push('Visita di controllo');
+  if (m.disturbi)  motivoVoci.push('Disturbi visivi: ' + m.disturbi);
+  if (m.prescrizione) motivoVoci.push('Prescrizione occhiali/lenti');
+  if (m.altro)     motivoVoci.push('Altro: ' + m.altro);
+
+  // Stato corrente
+  const stato = p.stato;
+  const isInCorso   = stato === STATI.IN_CORSO;
+  const isInStop    = stato === STATI.IN_STOP;
+  const isRefertato = stato === STATI.REFERTATO;
+  const isConsenso  = stato === STATI.CONSENSO;
+  const isCompletato = stato === STATI.COMPLETATO;
+  const hasReferto  = isRefertato || isConsenso || isCompletato;
+  const canReferto  = isInCorso || isInStop;
+
+  // Barra azioni
+  let azioni = '';
+  // Modifica anagrafica: sempre disponibile
+  azioni += `<button class="btn" id="det-btn-modifica">Modifica</button> `;
+  // Referto: solo se in corso o in stop
+  if (canReferto) {
+    azioni += `<button class="btn btn-primary" id="det-btn-referto">Referto</button> `;
+  }
+  // Toggle In stop / Riprendi
+  if (isInCorso) {
+    azioni += `<button class="btn" id="det-btn-stop">In stop</button> `;
+  } else if (isInStop) {
+    azioni += `<button class="btn btn-primary" id="det-btn-riprendi">Riprendi</button> `;
+  }
+  // Genera PDF: se refertato+
+  if (hasReferto) {
+    azioni += `<button class="btn btn-primary" id="det-btn-pdf">Genera PDF</button> `;
+  }
+  // Completa: solo se consenso firmato (non già completato)
+  if (isConsenso) {
+    azioni += `<button class="btn" id="det-btn-completa">Completa</button> `;
+  }
+  // Torna alla board
+  azioni += `<button class="btn" id="det-btn-back" style="margin-left:auto;">← Board</button>`;
+
+  // Card referto (solo se compilato)
+  let cardReferto = '';
+  if (hasReferto) {
+    const refRow = (label, val) => val ? `<div style="margin-bottom:8px;"><span style="font-size:0.78rem;color:var(--txt2);font-weight:600;text-transform:uppercase;letter-spacing:.06em;">${label}</span><br><span style="font-size:0.9rem;">${val}</span></div>` : '';
+    cardReferto = `
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Referto</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${refRow('APO', r.apo)}
+          ${refRow('APG', r.apg)}
+          ${refRow('Annessi', r.annessi)}
+          ${refRow('Visus OD', r.visusOD)}
+          ${refRow('Visus OS', r.visusOS)}
+          ${refRow('Acuità lontano OD', r.acuitaLontanoOD)}
+          ${refRow('Acuità lontano OS', r.acuitaLontanoOS)}
+          ${refRow('Acuità vicino OD', r.acuitaVicinoOD)}
+          ${refRow('Acuità vicino OS', r.acuitaVicinoOS)}
+          ${refRow('Refr. OD', (od.sph||od.cyl||od.asse) ? `Sph ${od.sph} Cyl ${od.cyl} Asse ${od.asse}` : '')}
+          ${refRow('Refr. OS', (os.sph||os.cyl||os.asse) ? `Sph ${os.sph} Cyl ${os.cyl} Asse ${os.asse}` : '')}
+          ${refRow('Pressione OD', r.pressioneOD ? r.pressioneOD + ' mmHg' : '')}
+          ${refRow('Pressione OS', r.pressioneOS ? r.pressioneOS + ' mmHg' : '')}
+          ${refRow('Tono OD', r.tonoOD ? r.tonoOD + ' mmHg' : '')}
+          ${refRow('Tono OS', r.tonoOS ? r.tonoOS + ' mmHg' : '')}
+          ${refRow('Fundus OD', r.fundusOD)}
+          ${refRow('Fundus OS', r.fundusOS)}
+          ${refRow('Altri esami', r.altriEsami)}
+        </div>
+        ${r.diagnosi ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--bordo);">${refRow('Diagnosi', r.diagnosi)}</div>` : ''}
+      </div>`;
+  }
+
+  // Card consenso
+  let cardConsenso = '';
+  if (p.firmaConsenso) {
+    cardConsenso = `
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Consenso GDPR</div>
+        <img src="${p.firmaConsenso}" alt="Firma consenso" style="max-width:240px;border:1px solid var(--bordo);border-radius:8px;background:#fff;display:block;">
+        <div style="font-size:0.8rem;color:var(--txt2);margin-top:6px;">Firma apposta</div>
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div style="max-width:760px;">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+        <h1 style="font-size:1.5rem;font-weight:700;">#${id}</h1>
+        ${badgeStato(stato)}
+      </div>
+      <div style="font-size:0.82rem;color:var(--txt2);margin-bottom:24px;">
+        <span style="cursor:pointer;" id="det-bread-home">Home</span>
+        <span> / </span>
+        <span style="cursor:pointer;" id="det-bread-board">Pazienti</span>
+        <span> / </span>
+        <span>${nome}</span>
+      </div>
+
+      <!-- Riepilogo -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Riepilogo</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${campo('Paziente', nome)}
+          ${campo('Data di nascita', a.dataNascita)}
+          ${campo('Codice Fiscale', a.codiceFiscale)}
+          ${campo('Medico assegnato', p.medicoAssegnato || '—')}
+        </div>
+      </div>
+
+      <!-- Anagrafica -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Anagrafica</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${campo('Cognome', a.cognome)}
+          ${campo('Nome', a.nome)}
+          ${campo('Data di nascita', a.dataNascita)}
+          ${campo('Sesso', a.sesso)}
+          ${campo('Comune di nascita', a.comuneNascita)}
+          ${campo('Codice Fiscale', a.codiceFiscale)}
+          ${campo('Indirizzo', a.indirizzo)}
+          ${campo('Telefono', a.telefono)}
+          ${campo('Email', a.email)}
+        </div>
+      </div>
+
+      <!-- Motivo / Anamnesi -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Motivo e Anamnesi</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          ${campo('Motivo visita', motivoVoci.length ? motivoVoci.join('; ') : '—')}
+          ${campo('Problemi agli occhi', an.problemiOcchi)}
+          ${campo('Quali problemi', an.qualiProblemi)}
+          ${campo('Porta occhiali', an.portaOcchiali)}
+          ${campo('Da quanto tempo', an.daQuanto)}
+          ${campo('Malattie sistemiche', an.malattie)}
+          ${campo('Farmaci assunti', an.farmaci)}
+          ${campo('Interventi pregressi', an.interventi)}
+        </div>
+      </div>
+
+      <!-- Referto -->
+      ${cardReferto}
+
+      <!-- Consenso -->
+      ${cardConsenso}
+
+      <!-- Timeline -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Timeline</div>
+        ${renderTimeline(p.eventi)}
+      </div>
+
+      <!-- Barra azioni -->
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 0 24px;">
+        ${azioni}
+      </div>
+    </div>`;
+
+  // Listener breadcrumb
+  container.querySelector('#det-bread-home').onclick = () => showView('board');
+  container.querySelector('#det-bread-board').onclick = () => showView('board');
+  container.querySelector('#det-btn-back').onclick = () => showView('board');
+
+  // Modifica
+  container.querySelector('#det-btn-modifica').onclick = () => {
+    const cont = document.getElementById('view-dettaglio');
+    const pFresh = db.getPaziente(id);
+    cont.innerHTML = '';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'btn';
+    backBtn.style.marginBottom = '16px';
+    backBtn.textContent = '← Dettaglio';
+    backBtn.onclick = () => renderDettaglio(cont, id);
+    cont.appendChild(backBtn);
+    const formEl = document.createElement('div');
+    cont.appendChild(formEl);
+    renderAnagrafica(formEl, {
+      paziente: pFresh,
+      editable: true,
+      submitLabel: 'Salva modifiche',
+      onSubmit: function(dati) {
+        db.updatePaziente(id, dati);
+        renderDettaglio(cont, id);
+      }
+    });
+  };
+
+  // Referto
+  const btnReferto = container.querySelector('#det-btn-referto');
+  if (btnReferto) {
+    btnReferto.onclick = () => {
+      renderReferto(document.getElementById('view-referto'), id);
+      showView('referto');
+    };
+  }
+
+  // In stop
+  const btnStop = container.querySelector('#det-btn-stop');
+  if (btnStop) {
+    btnStop.onclick = () => {
+      pushEvento(id, STATI.IN_STOP);
+      renderDettaglio(container, id);
+    };
+  }
+
+  // Riprendi
+  const btnRiprendi = container.querySelector('#det-btn-riprendi');
+  if (btnRiprendi) {
+    btnRiprendi.onclick = () => {
+      pushEvento(id, STATI.IN_CORSO);
+      renderDettaglio(container, id);
+    };
+  }
+
+  // Genera PDF
+  const btnPDF = container.querySelector('#det-btn-pdf');
+  if (btnPDF) btnPDF.onclick = () => generaPDF(id);
+
+  // Completa
+  const btnCompleta = container.querySelector('#det-btn-completa');
+  if (btnCompleta) {
+    btnCompleta.onclick = () => {
+      pushEvento(id, STATI.COMPLETATO);
+      renderDettaglio(container, id);
+    };
+  }
 }
 
 // ── prendiInCarico ────────────────────────────────────────────────────────────
