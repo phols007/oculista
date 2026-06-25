@@ -1604,11 +1604,12 @@ function generaPDF(id) {
   // DATI DEL PAZIENTE
   const a = p.anagrafica || {};
   section('DATI DEL PAZIENTE', [
-    'Cognome e Nome: ' + nomeCompleto(p),
+    'Cognome: ' + (a.cognome || ''),
+    'Nome: ' + (a.nome || ''),
     'Data di nascita: ' + (a.dataNascita || ''),
     'Sesso: ' + (a.sesso || ''),
-    'Codice Fiscale: ' + (a.codiceFiscale || ''),
     'Comune di nascita: ' + (a.comuneNascita || ''),
+    'Codice Fiscale: ' + (a.codiceFiscale || ''),
     'Indirizzo: ' + (a.indirizzo || ''),
     'Telefono: ' + (a.telefono || ''),
     'Email: ' + (a.email || '')
@@ -1624,8 +1625,11 @@ function generaPDF(id) {
   section('MOTIVO DELLA VISITA', motivoVoci.length ? motivoVoci : ['Non specificato']);
 
   // ANAMNESI OCULARE E GENERALE
+  const r = p.referto || {};
   const n = p.anamnesi || {};
   section('ANAMNESI OCULARE E GENERALE', [
+    'APO - Anamnesi Patologica Oculare: ' + (r.apo || ''),
+    'APG - Anamnesi Patologica Generale: ' + (r.apg || ''),
     'Ha mai avuto problemi agli occhi?: ' + (n.problemiOcchi || ''),
     'Se sì, quali?: ' + (n.qualiProblemi || ''),
     'Porta occhiali o lenti a contatto?: ' + (n.portaOcchiali || ''),
@@ -1636,11 +1640,12 @@ function generaPDF(id) {
   ]);
 
   // ESAME OBIETTIVO OCULARE
-  const r = p.referto || {};
   const od = r.refOD || {};
   const os = r.refOS || {};
   section('ESAME OBIETTIVO OCULARE', [
     'Esame Annessi e Segmento Anteriore: ' + (r.annessi || ''),
+    'Visus OD: ' + (r.visusOD || ''),
+    'Visus OS: ' + (r.visusOS || ''),
     'Acuità Visiva per Lontano OD: ' + (r.acuitaLontanoOD || ''),
     'Acuità Visiva per Lontano OS: ' + (r.acuitaLontanoOS || ''),
     'Acuità Visiva per Vicino OD: ' + (r.acuitaVicinoOD || ''),
@@ -1649,7 +1654,10 @@ function generaPDF(id) {
     'Refrazione OS: Sph ' + (os.sph || '') + ' Cyl ' + (os.cyl || '') + ' Asse ' + (os.asse || ''),
     'Pressione Intraoculare OD: ' + (r.pressioneOD || '') + ' mmHg',
     'Pressione Intraoculare OS: ' + (r.pressioneOS || '') + ' mmHg',
-    'Esame del Fondo Oculare: ' + (r.fondo || ''),
+    'Tono OD: ' + (r.tonoOD || '') + ' mmHg',
+    'Tono OS: ' + (r.tonoOS || '') + ' mmHg',
+    'Fundus OD: ' + (r.fundusOD || ''),
+    'Fundus OS: ' + (r.fundusOS || ''),
     'Altri Esami: ' + (r.altriEsami || '')
   ]);
 
