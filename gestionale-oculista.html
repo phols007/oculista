@@ -499,7 +499,7 @@ function nuovoPaziente() {
       refOD: { sph: '', cyl: '', asse: '' },
       refOS: { sph: '', cyl: '', asse: '' },
       pressioneOD: '', pressioneOS: '', tonoOD: '', tonoOS: '',
-      fundusOD: '', fundusOS: '', altriEsami: '', diagnosi: ''
+      fundusOD: '', fundusOS: '', altriEsami: '', noteMedico: '', diagnosi: ''
     },
     firmaConsenso: null,
     eventi: [],
@@ -1166,9 +1166,10 @@ function renderDettaglio(container, id) {
   } else if (isInStop) {
     azioni += `<button class="btn btn-primary" id="det-btn-riprendi">Riprendi</button> `;
   }
-  // Genera PDF: se refertato+
+  // Genera PDF / Invia email: se refertato+
   if (hasReferto) {
     azioni += `<button class="btn btn-primary" id="det-btn-pdf">Genera PDF</button> `;
+    azioni += `<button class="btn" id="det-btn-email">✉ Invia al paziente</button> `;
   }
   // Completa: solo se consenso firmato (non già completato)
   if (isConsenso) {
@@ -1356,6 +1357,10 @@ function renderDettaglio(container, id) {
   // Genera PDF
   const btnPDF = container.querySelector('#det-btn-pdf');
   if (btnPDF) btnPDF.onclick = () => generaPDF(id);
+
+  // Invia al paziente via email
+  const btnEmail = container.querySelector('#det-btn-email');
+  if (btnEmail) btnEmail.onclick = () => inviaRefertoEmail(id);
 
   // Completa
   const btnCompleta = container.querySelector('#det-btn-completa');
@@ -1732,6 +1737,15 @@ function renderReferto(container, id) {
       </div>
     </div>
 
+    <!-- Note del medico -->
+    <div class="form-section">
+      <h3>Note del medico</h3>
+      <div class="form-field">
+        <label>Annotazioni / osservazioni del medico</label>
+        ${ta('referto.noteMedico', r.noteMedico, 'Annotazioni libere del medico (es. consigli, follow-up, terapia...)')}
+      </div>
+    </div>
+
     <!-- Diagnosi e Prescrizione -->
     <div class="form-section">
       <h3>Diagnosi e Prescrizione</h3>
@@ -1741,18 +1755,30 @@ function renderReferto(container, id) {
       </div>
     </div>
 
-    <button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">Salva referto</button>
+    <div style="display:flex; gap:10px; margin-top:4px; flex-wrap:wrap;">
+      <button type="submit" class="btn btn-primary" style="flex:1; min-width:160px;">Salva referto</button>
+      <button type="button" id="btn-email-referto" class="btn" style="flex:1; min-width:160px;">✉ Salva e invia al paziente</button>
+    </div>
   </form>
 </div>`;
 
   container.querySelector('#btn-back-referto').addEventListener('click', () => showView('board'));
 
-  container.querySelector('#form-referto').addEventListener('submit', function(e) {
-    e.preventDefault();
+  function salvaReferto() {
     const referto = leggiRefertoDalForm(container);
     db.updatePaziente(id, { referto });
     pushEvento(id, STATI.REFERTATO);
+  }
+
+  container.querySelector('#form-referto').addEventListener('submit', function(e) {
+    e.preventDefault();
+    salvaReferto();
     showView('board');
+  });
+
+  container.querySelector('#btn-email-referto').addEventListener('click', function() {
+    salvaReferto();
+    inviaRefertoEmail(id);
   });
 }
 
@@ -1789,6 +1815,7 @@ function leggiRefertoDalForm(container) {
     fundusOD:    val('referto.fundusOD'),
     fundusOS:    val('referto.fundusOS'),
     altriEsami:  val('referto.altriEsami'),
+    noteMedico:  val('referto.noteMedico'),
     diagnosi:    val('referto.diagnosi')
   };
 }
@@ -2001,54 +2028,86 @@ function disegnaIntestazioneMedico(doc, key) {
   return y;
 }
 
-function generaPDF(id) {
+function costruisciDocReferto(id) {
   const p = db.getPaziente(id);
-  if (!p) { alert('Paziente non trovato.'); return; }
+  if (!p) { alert('Paziente non trovato.'); return null; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const medicoKey = p.medicoAssegnato || (typeof sessionCorrente === 'function' && sessionCorrente() ? sessionCorrente().user : null);
+  const M = 15, W = 180, ROSSO = [176, 0, 32];
   let y = 15;
 
-  const line = (t, b = false, size = 11) => {
-    doc.setFont('helvetica', b ? 'bold' : 'normal');
-    doc.setFontSize(size);
-    for (const ln of doc.splitTextToSize(t, 180)) {
-      if (y > 275) { doc.addPage(); y = 15; }
-      doc.text(ln, 15, y);
-      y += 6;
+  const ensure = h => { if (y + h > 284) { doc.addPage(); y = 15; } };
+  const sectionBar = (title) => {
+    ensure(13); y += 1.5;
+    doc.setFillColor(241, 243, 245); doc.rect(M, y, W, 7, 'F');
+    doc.setFillColor(ROSSO[0], ROSSO[1], ROSSO[2]); doc.rect(M, y, 1.6, 7, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(55);
+    doc.text(title, M + 4, y + 4.9);
+    doc.setTextColor(0); y += 10;
+  };
+  const kv = (label, value) => {
+    const val = ((value == null ? '' : String(value)).trim()) || '—';
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.2);
+    const lw = doc.getTextWidth(label + ':  ');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6);
+    const lines = doc.splitTextToSize(val, W - 4 - lw);
+    ensure(lines.length * 4.8 + 1.5);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.2); doc.setTextColor(105);
+    doc.text(label + ':', M + 2, y + 3.4);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.6); doc.setTextColor(25);
+    lines.forEach((ln, i) => doc.text(ln, M + 2 + lw, y + 3.4 + i * 4.8));
+    doc.setTextColor(0);
+    y += Math.max(5, lines.length * 4.8) + 1.5;
+  };
+  const para = (text) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(25);
+    const lines = doc.splitTextToSize((text || '').toString().trim() || '—', W - 4);
+    ensure(lines.length * 5 + 2);
+    lines.forEach((ln, i) => doc.text(ln, M + 2, y + 4 + i * 5));
+    doc.setTextColor(0);
+    y += lines.length * 5 + 2;
+  };
+  const twoCol = (pairs) => {
+    pairs = pairs.filter(Boolean);
+    const nRows = Math.ceil(pairs.length / 2), boxH = nRows * 6.4 + 5;
+    ensure(boxH + 2);
+    doc.setDrawColor(222); doc.setFillColor(250, 250, 251);
+    doc.roundedRect(M, y, W, boxH, 2, 2, 'FD');
+    let yy = y + 6; const colX = [M + 4, M + W / 2 + 2];
+    for (let i = 0; i < pairs.length; i += 2) {
+      [pairs[i], pairs[i + 1]].forEach((pr, ci) => {
+        if (!pr) return;
+        const x = colX[ci];
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8.4); doc.setTextColor(115);
+        doc.text(pr[0] + ':', x, yy);
+        const lw = doc.getTextWidth(pr[0] + ':  ');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(30);
+        doc.text(String((pr[1] == null || pr[1] === '') ? '—' : pr[1]), x + lw, yy);
+      });
+      yy += 6.4;
     }
+    doc.setTextColor(0);
+    y += boxH + 3;
   };
 
-  const section = (title, lines) => {
-    y += 4;
-    line(title, true, 13);
-    y += 2;
-    if (Array.isArray(lines)) {
-      lines.forEach(t => line(t));
-    } else {
-      line(lines || '');
-    }
-    y += 3;
-  };
-
-  // Intestazione studio del medico
+  // Intestazione studio + titolo
   y = disegnaIntestazioneMedico(doc, medicoKey);
-  line('REFERTO VISITA OCULISTICA', true, 14);
-  y += 4;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(45);
+  doc.text('REFERTO DI VISITA OCULISTICA', M, y + 1);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120);
+  doc.text('Data: ' + new Date().toLocaleDateString('it-IT'), 195, y + 1, { align: 'right' });
+  doc.setTextColor(0); y += 8;
 
   // DATI DEL PAZIENTE
   const a = p.anagrafica || {};
-  section('DATI DEL PAZIENTE', [
-    'Cognome: ' + (a.cognome || ''),
-    'Nome: ' + (a.nome || ''),
-    'Data di nascita: ' + (a.dataNascita || ''),
-    'Sesso: ' + (a.sesso || ''),
-    'Comune di nascita: ' + (a.comuneNascita || ''),
-    'Codice Fiscale: ' + (a.codiceFiscale || ''),
-    'Indirizzo: ' + (a.indirizzo || ''),
-    'Città: ' + (a.citta || ''),
-    'Telefono: ' + (a.telefono || ''),
-    'Email: ' + (a.email || '')
+  sectionBar('DATI DEL PAZIENTE');
+  twoCol([
+    ['Cognome', a.cognome], ['Nome', a.nome],
+    ['Data di nascita', a.dataNascita], ['Sesso', a.sesso],
+    ['Codice Fiscale', a.codiceFiscale], ['Comune di nascita', a.comuneNascita],
+    ['Indirizzo', a.indirizzo], ['Città', a.citta],
+    ['Telefono', a.telefono], ['Email', a.email]
   ]);
 
   // MOTIVO DELLA VISITA
@@ -2058,81 +2117,111 @@ function generaPDF(id) {
   if (m.disturbi) motivoVoci.push(m.disturbi.trim() ? 'Disturbi visivi (' + m.disturbi.trim() + ')' : 'Disturbi visivi');
   if (m.prescrizione) motivoVoci.push('Prescrizione occhiali/lenti');
   if (m.altro) motivoVoci.push(m.altro.trim() ? 'Altro (' + m.altro.trim() + ')' : 'Altro');
-  section('MOTIVO DELLA VISITA', motivoVoci.length ? motivoVoci : ['Non specificato']);
+  sectionBar('MOTIVO DELLA VISITA');
+  para(motivoVoci.length ? motivoVoci.join('   ·   ') : 'Non specificato');
 
-  // ANAMNESI OCULARE E GENERALE
+  // ANAMNESI
   const r = p.referto || {};
   const n = p.anamnesi || {};
-  section('ANAMNESI OCULARE E GENERALE', [
-    'APO - Anamnesi Patologica Oculare: ' + (r.apo || ''),
-    'APG - Anamnesi Patologica Generale: ' + (r.apg || ''),
-    'Ha mai avuto problemi agli occhi?: ' + (n.problemiOcchi || ''),
-    'Se sì, quali?: ' + (n.qualiProblemi || ''),
-    'Porta occhiali o lenti a contatto?: ' + (n.portaOcchiali || ''),
-    'Da quanto tempo?: ' + (n.daQuanto || ''),
-    'Malattie sistemiche: ' + (n.malattie || ''),
-    'Farmaci assunti: ' + (n.farmaci || ''),
-    'Interventi oculari pregressi: ' + (n.interventi || '')
-  ]);
+  sectionBar('ANAMNESI');
+  kv('APO — Anamnesi Patologica Oculare', r.apo);
+  kv('APG — Anamnesi Patologica Generale', r.apg);
+  kv('Problemi agli occhi', (n.problemiOcchi || '') + (n.qualiProblemi ? ' — ' + n.qualiProblemi : ''));
+  kv('Occhiali / lenti a contatto', (n.portaOcchiali || '') + (n.daQuanto ? ' — da ' + n.daQuanto : ''));
+  kv('Malattie sistemiche', n.malattie);
+  kv('Farmaci assunti', n.farmaci);
+  kv('Interventi oculari pregressi', n.interventi);
 
   // ESAME OBIETTIVO OCULARE
   const od = r.refOD || {};
   const os = r.refOS || {};
-  section('ESAME OBIETTIVO OCULARE', [
-    'Esame Annessi e Segmento Anteriore: ' + (r.annessi || ''),
-    'Visus OD: ' + (r.visusOD || ''),
-    'Visus OS: ' + (r.visusOS || ''),
-    'Acuità Visiva per Lontano OD: ' + (r.acuitaLontanoOD || ''),
-    'Acuità Visiva per Lontano OS: ' + (r.acuitaLontanoOS || ''),
-    'Acuità Visiva per Vicino OD: ' + (r.acuitaVicinoOD || ''),
-    'Acuità Visiva per Vicino OS: ' + (r.acuitaVicinoOS || ''),
-    'Pressione Intraoculare OD: ' + (r.pressioneOD || '') + ' mmHg',
-    'Pressione Intraoculare OS: ' + (r.pressioneOS || '') + ' mmHg',
-    'Tono OD: ' + (r.tonoOD || '') + ' mmHg',
-    'Tono OS: ' + (r.tonoOS || '') + ' mmHg',
-    'Fundus OD: ' + (r.fundusOD || ''),
-    'Fundus OS: ' + (r.fundusOS || ''),
-    'Altri Esami: ' + (r.altriEsami || '')
+  sectionBar('ESAME OBIETTIVO OCULARE');
+  kv('Annessi e Segmento Anteriore', r.annessi);
+  twoCol([
+    ['Visus OD', r.visusOD], ['Visus OS', r.visusOS],
+    ['Acuità Lontano OD', r.acuitaLontanoOD], ['Acuità Lontano OS', r.acuitaLontanoOS],
+    ['Acuità Vicino OD', r.acuitaVicinoOD], ['Acuità Vicino OS', r.acuitaVicinoOS],
+    ['Pressione OD', r.pressioneOD ? r.pressioneOD + ' mmHg' : ''], ['Pressione OS', r.pressioneOS ? r.pressioneOS + ' mmHg' : ''],
+    ['Tono OD', r.tonoOD ? r.tonoOD + ' mmHg' : ''], ['Tono OS', r.tonoOS ? r.tonoOS + ' mmHg' : '']
   ]);
+  kv('Fundus OD', r.fundusOD);
+  kv('Fundus OS', r.fundusOS);
+  if (r.altriEsami) kv('Altri Esami', r.altriEsami);
 
-  // REFRAZIONE — stile modulo optometrico (goniometro + tabella Sf/Cil/Asse)
-  if (y > 215) { doc.addPage(); y = 15; }
-  line('REFRAZIONE', true); y += 1;
-  const gY = y + 24;
+  // REFRAZIONE — modulo optometrico (goniometro + tabella Sf/Cil/Asse)
+  sectionBar('REFRAZIONE');
+  ensure(58);
+  const gY = y + 23;
   disegnaGoniometroPDF(doc, 58, gY, 22, 'OCCHIO DESTRO');
   disegnaGoniometroPDF(doc, 150, gY, 22, 'OCCHIO SINISTRO');
   y = gY + 5;
   y = disegnaTabellaRxPDF(doc, y, od, os);
-  doc.setFont('helvetica', 'italic'); doc.setFontSize(9);
+  doc.setFont('helvetica', 'italic'); doc.setFontSize(9); doc.setTextColor(90);
   doc.text('Per distanza', 105, y + 5, { align: 'center' });
   doc.setFont('helvetica', 'normal'); doc.setTextColor(0); doc.setDrawColor(0); doc.setLineWidth(0.2);
   y += 12;
 
-  // DIAGNOSI E PRESCRIZIONE
-  section('DIAGNOSI E PRESCRIZIONE', r.diagnosi || '');
-
-  // Firma consenso
-  if (p.firmaConsenso) {
-    y += 4;
-    line('Firma consenso trattamento dati:', true);
-    if (y > 240) { doc.addPage(); y = 15; }
-    doc.addImage(p.firmaConsenso, 'PNG', 15, y, 80, 30);
-    y += 34;
+  // NOTE DEL MEDICO
+  if (r.noteMedico && r.noteMedico.trim()) {
+    sectionBar('NOTE DEL MEDICO');
+    para(r.noteMedico);
   }
 
-  // Footer studio su ogni pagina
+  // DIAGNOSI E PRESCRIZIONE
+  sectionBar('DIAGNOSI E PRESCRIZIONE');
+  para(r.diagnosi);
+
+  // Firme
   const mInt = INTESTAZIONI_MEDICI[medicoKey];
+  ensure(34); y += 8;
+  if (p.firmaConsenso) {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110);
+    doc.text('Firma consenso trattamento dati', M, y);
+    doc.addImage(p.firmaConsenso, 'PNG', M, y + 2, 58, 22);
+  }
+  doc.setDrawColor(120); doc.setLineWidth(0.3); doc.line(120, y + 16, 195, y + 16);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(70);
+  doc.text('Il Medico' + (mInt ? ' — ' + mInt.medico : ''), 157.5, y + 20, { align: 'center' });
+  doc.setTextColor(0);
+  y += 26;
+
+  // Footer studio su ogni pagina
   const nPag = doc.internal.getNumberOfPages();
   for (let i = 1; i <= nPag; i++) {
     doc.setPage(i);
-    doc.setFontSize(7.5); doc.setTextColor(130); doc.setFont('helvetica', 'normal');
+    doc.setDrawColor(225); doc.setLineWidth(0.2); doc.line(M, 286, M + W, 286);
+    doc.setFontSize(7.5); doc.setTextColor(135); doc.setFont('helvetica', 'normal');
     if (mInt) doc.text(mInt.studio + ' · ' + mInt.indirizzo, 105, 290, { align: 'center' });
     doc.text('Pag. ' + i + '/' + nPag, 195, 290, { align: 'right' });
     doc.setTextColor(0);
   }
 
   const nomeFile = (nomeCompleto(p) || 'paziente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
-  doc.save(nomeFile);
+  return { doc, nomeFile, p };
+}
+
+function generaPDF(id) {
+  const out = costruisciDocReferto(id);
+  if (out) out.doc.save(out.nomeFile);
+}
+
+function inviaRefertoEmail(id) {
+  const out = costruisciDocReferto(id);
+  if (!out) return;
+  const p = out.p;
+  const email = ((p.anagrafica && p.anagrafica.email) || '').trim();
+  out.doc.save(out.nomeFile); // scarica il PDF da allegare
+  const nome = nomeCompleto(p) || 'paziente';
+  const sess = (typeof sessionCorrente === 'function' && sessionCorrente()) ? sessionCorrente() : null;
+  const med = (sess && INTESTAZIONI_MEDICI[sess.user]) ? INTESTAZIONI_MEDICI[sess.user] : null;
+  if (!email) { alert('Il paziente non ha un indirizzo email.\nIl PDF è stato comunque scaricato.'); return; }
+  const oggetto = 'Referto visita oculistica — ' + nome;
+  const corpo =
+    'Gentile ' + nome + ',\n\nin allegato il referto della visita oculistica' + (med ? ' eseguita presso ' + med.studio : '') + '.\n\n' +
+    'NB: il file PDF "' + out.nomeFile + '" è stato scaricato sul dispositivo — allegare il documento a questa email prima di inviarla.\n\n' +
+    'Cordiali saluti' + (med ? ',\n' + med.medico + (med.studio ? '\n' + med.studio : '') : '');
+  window.location.href = 'mailto:' + encodeURIComponent(email) +
+    '?subject=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(corpo);
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
