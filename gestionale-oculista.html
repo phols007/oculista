@@ -1759,8 +1759,8 @@ registerRenderer('registrazione', function() {
     editable: true,
     submitLabel: 'Invia registrazione',
     onSubmit: function(dati) {
-      const p = nuovoPaziente();
-      const salvato = db.savePaziente({ ...p, ...dati, stato: STATI.REGISTRATO });
+      const salvato = db.savePaziente({ ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO });
+      pushEvento(salvato.id, STATI.REGISTRATO);
       mostraConferma(nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
     }
   });
