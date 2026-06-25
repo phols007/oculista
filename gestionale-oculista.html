@@ -482,7 +482,7 @@ function nuovoPaziente() {
     medicoAssegnato: null,
     anagrafica: {
       cognome: '', nome: '', dataNascita: '', sesso: '', codiceFiscale: '',
-      comuneNascita: '', indirizzo: '', telefono: '', email: ''
+      comuneNascita: '', indirizzo: '', citta: '', telefono: '', email: ''
     },
     motivo: {
       controllo: false, disturbi: '', prescrizione: false, altro: ''
@@ -907,9 +907,13 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
         <label>Comune di nascita</label>
         ${inp('anagrafica.comuneNascita', a.comuneNascita, 'Es. Roma')}
       </div>
-      <div class="form-field form-col-full">
+      <div class="form-field">
         <label>Indirizzo</label>
-        ${inp('anagrafica.indirizzo', a.indirizzo, 'Via Roma 1, Milano')}
+        ${inp('anagrafica.indirizzo', a.indirizzo, 'Via Roma 1')}
+      </div>
+      <div class="form-field">
+        <label>Città</label>
+        ${inp('anagrafica.citta', a.citta, 'Es. Cagliari')}
       </div>
       <div class="form-field">
         <label>Telefono</label>
@@ -1044,6 +1048,7 @@ function leggiAnagraficaDalForm(container) {
       codiceFiscale: val('anagrafica.codiceFiscale'),
       comuneNascita: val('anagrafica.comuneNascita'),
       indirizzo:     val('anagrafica.indirizzo'),
+      citta:         val('anagrafica.citta'),
       telefono:      val('anagrafica.telefono'),
       email:         val('anagrafica.email')
     },
@@ -1243,6 +1248,7 @@ function renderDettaglio(container, id) {
           ${campo('Comune di nascita', a.comuneNascita)}
           ${campo('Codice Fiscale', a.codiceFiscale)}
           ${campo('Indirizzo', a.indirizzo)}
+          ${campo('Città', a.citta)}
           ${campo('Telefono', a.telefono)}
           ${campo('Email', a.email)}
         </div>
@@ -1947,6 +1953,7 @@ function generaPDF(id) {
     'Comune di nascita: ' + (a.comuneNascita || ''),
     'Codice Fiscale: ' + (a.codiceFiscale || ''),
     'Indirizzo: ' + (a.indirizzo || ''),
+    'Città: ' + (a.citta || ''),
     'Telefono: ' + (a.telefono || ''),
     'Email: ' + (a.email || '')
   ]);
