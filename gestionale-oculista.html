@@ -468,8 +468,8 @@ function nuovoPaziente() {
     stato: STATI.REGISTRATO,
     medicoAssegnato: null,
     anagrafica: {
-      nome: '', dataNascita: '', sesso: '', codiceFiscale: '',
-      indirizzo: '', telefono: '', email: ''
+      cognome: '', nome: '', dataNascita: '', sesso: '', codiceFiscale: '',
+      comuneNascita: '', indirizzo: '', telefono: '', email: ''
     },
     motivo: {
       controllo: false, disturbi: '', prescrizione: false, altro: ''
@@ -490,6 +490,99 @@ function nuovoPaziente() {
     createdAt: null,
     updatedAt: null
   };
+}
+
+// ── nomeCompleto ──────────────────────────────────────────────────────────────
+function nomeCompleto(p) {
+  const a = (p && p.anagrafica) || {};
+  const cognome = (a.cognome || '').trim();
+  const nome    = (a.nome    || '').trim();
+  if (cognome && nome) return cognome + ' ' + nome;
+  return cognome || nome;
+}
+
+// ── validaCodiceFiscale ───────────────────────────────────────────────────────
+function validaCodiceFiscale(anagrafica) {
+  const cf = (anagrafica.codiceFiscale || '').toUpperCase().trim();
+  if (cf.length !== 16 || !/^[A-Z0-9]{16}$/.test(cf)) {
+    return { ok: false, msg: 'Il Codice Fiscale non corrisponde ai dati anagrafici' };
+  }
+
+  // Helpers
+  const VOWELS = new Set('AEIOU');
+  const MESI = 'ABCDEHLMPRST';
+
+  function codCognome(s) {
+    s = (s || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const cons = [...s].filter(c => !VOWELS.has(c));
+    const voc  = [...s].filter(c =>  VOWELS.has(c));
+    return (cons.join('') + voc.join('') + 'XXX').slice(0, 3);
+  }
+
+  function codNome(s) {
+    s = (s || '').toUpperCase().replace(/[^A-Z]/g, '');
+    const cons = [...s].filter(c => !VOWELS.has(c));
+    if (cons.length >= 4) return cons[0] + cons[2] + cons[3];
+    const voc = [...s].filter(c => VOWELS.has(c));
+    return (cons.join('') + voc.join('') + 'XXX').slice(0, 3);
+  }
+
+  // Data: accetta GG/MM/AAAA o AAAA-MM-GG
+  function parseData(s) {
+    if (!s) return null;
+    let g, m, a;
+    const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const iso   = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (slash) { [,g,m,a] = slash; }
+    else if (iso) { [,a,m,g] = iso; }
+    else return null;
+    return { g: parseInt(g,10), m: parseInt(m,10), a: parseInt(a,10) };
+  }
+
+  // Checksum
+  const ODD = {
+    '0':1,'1':0,'2':5,'3':7,'4':9,'5':13,'6':15,'7':17,'8':19,'9':21,
+    'A':1,'B':0,'C':5,'D':7,'E':9,'F':13,'G':15,'H':17,'I':19,'J':21,
+    'K':2,'L':4,'M':18,'N':20,'O':11,'P':3,'Q':6,'R':8,'S':12,'T':14,
+    'U':16,'V':10,'W':22,'X':25,'Y':24,'Z':23
+  };
+  const EVEN = {
+    '0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,
+    'A':0,'B':1,'C':2,'D':3,'E':4,'F':5,'G':6,'H':7,'I':8,'J':9,
+    'K':10,'L':11,'M':12,'N':13,'O':14,'P':15,'Q':16,'R':17,'S':18,'T':19,
+    'U':20,'V':21,'W':22,'X':23,'Y':24,'Z':25
+  };
+  function checksum(s) {
+    let tot = 0;
+    for (let i = 0; i < 15; i++) {
+      tot += (i % 2 === 0) ? ODD[s[i]] : EVEN[s[i]];
+    }
+    return String.fromCharCode(65 + (tot % 26));
+  }
+
+  const attCognome = codCognome(anagrafica.cognome);
+  const attNome    = codNome(anagrafica.nome);
+  const data       = parseData(anagrafica.dataNascita);
+  const sesso      = (anagrafica.sesso || '').toUpperCase();
+
+  const err = { ok: false, msg: 'Il Codice Fiscale non corrisponde ai dati anagrafici' };
+
+  if (cf.slice(0, 3) !== attCognome) return err;
+  if (cf.slice(3, 6) !== attNome)    return err;
+
+  if (data) {
+    const aa = String(data.a).slice(-2).padStart(2, '0');
+    const mm = MESI[data.m - 1];
+    if (!mm) return err;
+    const gg = sesso === 'F' ? String(data.g + 40).padStart(2, '0') : String(data.g).padStart(2, '0');
+    const attData = aa + mm + gg;
+    if (cf.slice(6, 11) !== attData) return err;
+  }
+
+  const attCheck = checksum(cf);
+  if (cf[15] !== attCheck) return err;
+
+  return { ok: true };
 }
 
 // ── Session ───────────────────────────────────────────────────────────────────
@@ -734,8 +827,12 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
     <h3>Dati paziente</h3>
     <div class="form-grid">
       <div class="form-field">
-        <label>Nome e Cognome *</label>
-        ${inp('anagrafica.nome', a.nome, 'Es. Anna Verdi')}
+        <label>Cognome *</label>
+        ${inp('anagrafica.cognome', a.cognome, 'Es. Verdi')}
+      </div>
+      <div class="form-field">
+        <label>Nome *</label>
+        ${inp('anagrafica.nome', a.nome, 'Es. Anna')}
       </div>
       <div class="form-field">
         <label>Data di nascita * (GG/MM/AAAA)</label>
@@ -751,6 +848,10 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
       <div class="form-field">
         <label>Codice Fiscale</label>
         ${inp('anagrafica.codiceFiscale', a.codiceFiscale, 'RSSMRA80A01H501Z')}
+      </div>
+      <div class="form-field">
+        <label>Comune di nascita</label>
+        ${inp('anagrafica.comuneNascita', a.comuneNascita, 'Es. Roma')}
       </div>
       <div class="form-field form-col-full">
         <label>Indirizzo</label>
@@ -838,14 +939,26 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
       e.preventDefault();
       const dati = leggiAnagraficaDalForm(container);
       const errEl = container.querySelector('#form-error');
-      // Validazione: Nome e Data nascita obbligatori
+      // Validazione: Cognome, Nome e Data nascita obbligatori
+      if (!dati.anagrafica.cognome.trim()) {
+        errEl.textContent = 'Il campo Cognome è obbligatorio.';
+        return;
+      }
       if (!dati.anagrafica.nome.trim()) {
-        errEl.textContent = 'Il campo Nome e Cognome è obbligatorio.';
+        errEl.textContent = 'Il campo Nome è obbligatorio.';
         return;
       }
       if (!dati.anagrafica.dataNascita.trim()) {
         errEl.textContent = 'Il campo Data di nascita è obbligatorio.';
         return;
+      }
+      // Validazione CF opzionale
+      if (dati.anagrafica.codiceFiscale.trim()) {
+        const cfCheck = validaCodiceFiscale(dati.anagrafica);
+        if (!cfCheck.ok) {
+          errEl.textContent = cfCheck.msg;
+          return;
+        }
       }
       errEl.textContent = '';
       onSubmit(dati);
@@ -870,10 +983,12 @@ function leggiAnagraficaDalForm(container) {
 
   return {
     anagrafica: {
+      cognome:       val('anagrafica.cognome'),
       nome:          val('anagrafica.nome'),
       dataNascita:   val('anagrafica.dataNascita'),
       sesso:         radio('anagrafica.sesso'),
       codiceFiscale: val('anagrafica.codiceFiscale'),
+      comuneNascita: val('anagrafica.comuneNascita'),
       indirizzo:     val('anagrafica.indirizzo'),
       telefono:      val('anagrafica.telefono'),
       email:         val('anagrafica.email')
@@ -950,7 +1065,7 @@ function renderBoard(container, filtroSoloAttesa) {
   );
 
   function rigaPaziente(p) {
-    const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+    const nome = nomeCompleto(p) || '(senza nome)';
     const isAttesa = p.stato === STATI.REGISTRATO || p.stato === STATI.IN_ATTESA;
     const isInCorso = p.stato === STATI.IN_CORSO;
     const isInStop  = p.stato === STATI.IN_STOP;
@@ -1073,7 +1188,7 @@ function renderReferto(container, id) {
 
   <div class="card" style="margin-bottom:24px;">
     <div style="font-size:0.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:4px;">Paziente</div>
-    <div style="font-size:1.1rem; font-weight:600;">${(p.anagrafica && p.anagrafica.nome) || '(senza nome)'}</div>
+    <div style="font-size:1.1rem; font-weight:600;">${nomeCompleto(p) || '(senza nome)'}</div>
   </div>
 
   <form id="form-referto" autocomplete="off">
@@ -1263,7 +1378,7 @@ registerRenderer('registrazione', function() {
     onSubmit: function(dati) {
       const p = nuovoPaziente();
       const salvato = db.savePaziente({ ...p, ...dati, stato: STATI.REGISTRATO });
-      mostraConferma(dati.anagrafica.nome);
+      mostraConferma(nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
     }
   });
 });
@@ -1283,7 +1398,7 @@ function initFirmaCanvas(canvas){
 function renderConsenso(container, id) {
   const p = db.getPaziente(id);
   if (!p) { container.innerHTML = '<p>Paziente non trovato.</p>'; return; }
-  const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+  const nome = nomeCompleto(p) || '(senza nome)';
 
   container.innerHTML = `
 <div style="max-width:700px;">
@@ -1376,7 +1491,7 @@ registerRenderer('firma-consenso', function() {
   }
 
   const righe = refertati.map(p => {
-    const nome = (p.anagrafica && p.anagrafica.nome) ? p.anagrafica.nome : '(senza nome)';
+    const nome = nomeCompleto(p) || '(senza nome)';
     return `
       <div class="board-row" data-id="${p.id}" style="cursor:pointer;">
         <span class="board-nome">${nome}</span>
@@ -1442,10 +1557,11 @@ function generaPDF(id) {
   // DATI DEL PAZIENTE
   const a = p.anagrafica || {};
   section('DATI DEL PAZIENTE', [
-    'Nome e Cognome: ' + (a.nome || ''),
+    'Cognome e Nome: ' + nomeCompleto(p),
     'Data di nascita: ' + (a.dataNascita || ''),
     'Sesso: ' + (a.sesso || ''),
     'Codice Fiscale: ' + (a.codiceFiscale || ''),
+    'Comune di nascita: ' + (a.comuneNascita || ''),
     'Indirizzo: ' + (a.indirizzo || ''),
     'Telefono: ' + (a.telefono || ''),
     'Email: ' + (a.email || '')
@@ -1502,7 +1618,7 @@ function generaPDF(id) {
     y += 34;
   }
 
-  const nomeFile = (a.nome || 'paziente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+  const nomeFile = (nomeCompleto(p) || 'paziente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
   doc.save(nomeFile);
 }
 
