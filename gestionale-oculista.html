@@ -1970,11 +1970,43 @@ registerRenderer('firma-consenso', function() {
 });
 
 // ── generaPDF ─────────────────────────────────────────────────────────────────
+// Intestazioni studio per utenza (placeholder inventati — da sostituire coi reali)
+const INTESTAZIONI_MEDICI = {
+  rossi: {
+    studio: 'Studio Oculistico Dr. Rossi',
+    medico: 'Dott. Marco Rossi', spec: 'Specialista in Oftalmologia',
+    indirizzo: 'Via Roma 12 · 09124 Cagliari (CA)',
+    contatti: 'Tel 070 123 4567 · studio.rossi@pec.it · P.IVA 01234567890 · Albo Medici CA n. 4567'
+  },
+  bianchi: {
+    studio: 'Centro Oftalmico Bianchi',
+    medico: 'Dott.ssa Laura Bianchi', spec: 'Specialista in Oftalmologia',
+    indirizzo: 'Viale Trieste 88 · 09123 Cagliari (CA)',
+    contatti: 'Tel 070 765 4321 · centro.bianchi@pec.it · P.IVA 09876543210 · Albo Medici CA n. 7890'
+  }
+};
+function disegnaIntestazioneMedico(doc, key) {
+  const m = INTESTAZIONI_MEDICI[key];
+  let y = 15;
+  if (!m) return y;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(176, 0, 32);
+  doc.text(m.studio, 15, y); y += 6;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor(40);
+  doc.text(m.medico + ' — ' + m.spec, 15, y); y += 5;
+  doc.setFontSize(8.5); doc.setTextColor(90);
+  doc.text(m.indirizzo, 15, y); y += 4;
+  doc.text(m.contatti, 15, y); y += 5;
+  doc.setDrawColor(176, 0, 32); doc.setLineWidth(0.5); doc.line(15, y, 195, y); y += 7;
+  doc.setTextColor(0); doc.setDrawColor(0); doc.setLineWidth(0.2);
+  return y;
+}
+
 function generaPDF(id) {
   const p = db.getPaziente(id);
   if (!p) { alert('Paziente non trovato.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const medicoKey = p.medicoAssegnato || (typeof sessionCorrente === 'function' && sessionCorrente() ? sessionCorrente().user : null);
   let y = 15;
 
   const line = (t, b = false, size = 11) => {
@@ -1999,8 +2031,9 @@ function generaPDF(id) {
     y += 3;
   };
 
-  // Intestazione
-  line('Modulo Visita Oculistica', true, 16);
+  // Intestazione studio del medico
+  y = disegnaIntestazioneMedico(doc, medicoKey);
+  line('REFERTO VISITA OCULISTICA', true, 14);
   y += 4;
 
   // DATI DEL PAZIENTE
@@ -2085,6 +2118,17 @@ function generaPDF(id) {
     if (y > 240) { doc.addPage(); y = 15; }
     doc.addImage(p.firmaConsenso, 'PNG', 15, y, 80, 30);
     y += 34;
+  }
+
+  // Footer studio su ogni pagina
+  const mInt = INTESTAZIONI_MEDICI[medicoKey];
+  const nPag = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= nPag; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7.5); doc.setTextColor(130); doc.setFont('helvetica', 'normal');
+    if (mInt) doc.text(mInt.studio + ' · ' + mInt.indirizzo, 105, 290, { align: 'center' });
+    doc.text('Pag. ' + i + '/' + nPag, 195, 290, { align: 'right' });
+    doc.setTextColor(0);
   }
 
   const nomeFile = (nomeCompleto(p) || 'paziente').replace(/\s+/g, '_') + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
