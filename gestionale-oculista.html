@@ -479,11 +479,14 @@ function nuovoPaziente() {
       daQuanto: '', malattie: '', farmaci: '', interventi: ''
     },
     referto: {
-      annessi: '', acuitaLontanoOD: '', acuitaLontanoOS: '',
+      apo: '', apg: '',
+      annessi: '', visusOD: '', visusOS: '',
+      acuitaLontanoOD: '', acuitaLontanoOS: '',
       acuitaVicinoOD: '', acuitaVicinoOS: '',
       refOD: { sph: '', cyl: '', asse: '' },
       refOS: { sph: '', cyl: '', asse: '' },
-      pressioneOD: '', pressioneOS: '', fondo: '', altriEsami: '', diagnosi: ''
+      pressioneOD: '', pressioneOS: '', tonoOD: '', tonoOS: '',
+      fundusOD: '', fundusOS: '', altriEsami: '', diagnosi: ''
     },
     firmaConsenso: null,
     eventi: [],
@@ -1193,12 +1196,35 @@ function renderReferto(container, id) {
 
   <form id="form-referto" autocomplete="off">
 
+    <!-- Anamnesi Clinica -->
+    <div class="form-section">
+      <h3>Anamnesi Clinica</h3>
+      <div class="form-field">
+        <label>APO — Anamnesi Patologica Oculare</label>
+        ${ta('referto.apo', r.apo, 'Descrivi...')}
+      </div>
+      <div class="form-field">
+        <label>APG — Anamnesi Patologica Generale</label>
+        ${ta('referto.apg', r.apg, 'Descrivi...')}
+      </div>
+    </div>
+
     <!-- Esame Annessi e Segmento Anteriore -->
     <div class="form-section">
       <h3>Esame Annessi e Segmento Anteriore</h3>
       <div class="form-field">
         <label>Esame Annessi e Segmento Anteriore</label>
         ${ta('referto.annessi', r.annessi, 'Descrivi...')}
+      </div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Visus OD</label>
+          ${inp('referto.visusOD', r.visusOD, 'Es. 10/10')}
+        </div>
+        <div class="form-field">
+          <label>Visus OS</label>
+          ${inp('referto.visusOS', r.visusOS, 'Es. 10/10')}
+        </div>
       </div>
     </div>
 
@@ -1269,15 +1295,29 @@ function renderReferto(container, id) {
           <label>OS (mmHg)</label>
           ${inp('referto.pressioneOS', r.pressioneOS, 'Es. 14')}
         </div>
+        <div class="form-field">
+          <label>Tono OD (mmHg)</label>
+          ${inp('referto.tonoOD', r.tonoOD, 'Es. 15')}
+        </div>
+        <div class="form-field">
+          <label>Tono OS (mmHg)</label>
+          ${inp('referto.tonoOS', r.tonoOS, 'Es. 15')}
+        </div>
       </div>
     </div>
 
-    <!-- Esame del Fondo Oculare -->
+    <!-- Fundus Oculi -->
     <div class="form-section">
-      <h3>Esame del Fondo Oculare</h3>
-      <div class="form-field">
-        <label>Esame del Fondo Oculare</label>
-        ${ta('referto.fondo', r.fondo, 'Descrivi...')}
+      <h3>Fundus Oculi</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Fundus OD</label>
+          ${ta('referto.fundusOD', r.fundusOD, 'Descrivi...')}
+        </div>
+        <div class="form-field">
+          <label>Fundus OS</label>
+          ${ta('referto.fundusOS', r.fundusOS, 'Descrivi...')}
+        </div>
       </div>
     </div>
 
@@ -1321,7 +1361,11 @@ function leggiRefertoDalForm(container) {
     return el ? el.value : '';
   }
   return {
+    apo:             val('referto.apo'),
+    apg:             val('referto.apg'),
     annessi:         val('referto.annessi'),
+    visusOD:         val('referto.visusOD'),
+    visusOS:         val('referto.visusOS'),
     acuitaLontanoOD: val('referto.acuitaLontanoOD'),
     acuitaLontanoOS: val('referto.acuitaLontanoOS'),
     acuitaVicinoOD:  val('referto.acuitaVicinoOD'),
@@ -1338,7 +1382,10 @@ function leggiRefertoDalForm(container) {
     },
     pressioneOD: val('referto.pressioneOD'),
     pressioneOS: val('referto.pressioneOS'),
-    fondo:       val('referto.fondo'),
+    tonoOD:      val('referto.tonoOD'),
+    tonoOS:      val('referto.tonoOS'),
+    fundusOD:    val('referto.fundusOD'),
+    fundusOS:    val('referto.fundusOS'),
     altriEsami:  val('referto.altriEsami'),
     diagnosi:    val('referto.diagnosi')
   };
