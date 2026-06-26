@@ -312,6 +312,31 @@
       color: var(--ambra-txt);
       font-size: 0.85em;
     }
+
+    /* ── Lista pazienti (storico) ── */
+    .lista-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .lista-table th {
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--txt2);
+      padding: 10px 14px;
+      border-bottom: 2px solid var(--bordo);
+    }
+    .lista-table td {
+      padding: 13px 14px;
+      border-bottom: 1px solid var(--bordo);
+      vertical-align: middle;
+    }
+    .lista-table tbody tr:last-child td { border-bottom: none; }
+    .lista-table tbody tr:hover { background: rgba(0,0,0,.04); }
+    .lista-table tbody tr { transition: background .12s; }
   </style>
 </head>
 <body>
@@ -2223,6 +2248,310 @@ function inviaRefertoEmail(id) {
   window.location.href = 'mailto:' + encodeURIComponent(email) +
     '?subject=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(corpo);
 }
+
+// ── renderListaPazienti ───────────────────────────────────────────────────────
+function renderListaPazienti(container) {
+  const ORDINE_STATI = [
+    STATI.IN_CORSO, STATI.IN_STOP, STATI.IN_ATTESA, STATI.REGISTRATO,
+    STATI.REFERTATO, STATI.CONSENSO, STATI.COMPLETATO
+  ];
+
+  function ordina(lista) {
+    return lista.slice().sort((a, b) => {
+      const ia = ORDINE_STATI.indexOf(a.stato);
+      const ib = ORDINE_STATI.indexOf(b.stato);
+      if (ia !== ib) return ia - ib;
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+    });
+  }
+
+  function righeHTML(pazienti) {
+    if (pazienti.length === 0) {
+      return `<tr><td colspan="5" style="text-align:center; padding:32px; color:var(--txt2);">Nessun paziente trovato.</td></tr>`;
+    }
+    return pazienti.map(p => {
+      const nome   = nomeCompleto(p) || '(senza nome)';
+      const medico = p.medicoAssegnato && UTENTI[p.medicoAssegnato]
+        ? UTENTI[p.medicoAssegnato].nome : (p.medicoAssegnato || '—');
+      const data   = p.createdAt ? new Date(p.createdAt).toLocaleDateString('it-IT') : '—';
+      const ultima = p.eventi && p.eventi.length
+        ? new Date(p.eventi[p.eventi.length - 1].ts).toLocaleString('it-IT') : '—';
+      return `
+        <tr class="lista-row" data-id="${p.id}" title="Apri dettaglio">
+          <td style="font-weight:600;">${nome}</td>
+          <td>${data}</td>
+          <td>${medico}</td>
+          <td>${badgeStato(p.stato)}</td>
+          <td>${ultima}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  function appliFiltro() {
+    const tutti    = db.getPazienti();
+    const testo    = (container.querySelector('#lista-cerca') || {}).value || '';
+    const stato    = (container.querySelector('#lista-stato-filtro') || {}).value || '';
+    let filtrati   = tutti;
+    if (testo.trim()) {
+      const q = testo.trim().toLowerCase();
+      filtrati = filtrati.filter(p => nomeCompleto(p).toLowerCase().includes(q));
+    }
+    if (stato) filtrati = filtrati.filter(p => p.stato === stato);
+    filtrati = ordina(filtrati);
+
+    const tbody = container.querySelector('.lista-table tbody');
+    if (tbody) tbody.innerHTML = righeHTML(filtrati);
+    const contatore = container.querySelector('#lista-contatore');
+    if (contatore) contatore.textContent = filtrati.length !== tutti.length
+      ? filtrati.length + ' di ' + tutti.length + ' pazienti'
+      : tutti.length + ' pazienti';
+
+    container.querySelectorAll('.lista-row').forEach(row => {
+      row.addEventListener('click', () => apriDettaglio(row.dataset.id));
+    });
+  }
+
+  const tutti = db.getPazienti();
+  const opzioniStato = ['', ...ORDINE_STATI].map(s =>
+    `<option value="${s}">${s || 'Tutti gli stati'}</option>`
+  ).join('');
+
+  container.innerHTML = `
+<div style="max-width:900px;">
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
+    <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Storico Pazienti</h2>
+    <span id="lista-contatore" style="font-size:0.85rem; color:var(--txt2);">${tutti.length} pazienti</span>
+  </div>
+  <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+    <input id="lista-cerca" type="search" placeholder="Cerca per nome…"
+      style="flex:1; min-width:180px; padding:8px 12px; border:1px solid var(--bordo); border-radius:10px; font-size:0.9rem; background:#fff;">
+    <select id="lista-stato-filtro" style="padding:8px 12px; border:1px solid var(--bordo); border-radius:10px; font-size:0.9rem; background:#fff;">
+      ${opzioniStato}
+    </select>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="lista-table">
+      <thead>
+        <tr>
+          <th>Paziente</th><th>Data reg.</th><th>Medico</th><th>Stato</th><th>Ultimo aggiornamento</th>
+        </tr>
+      </thead>
+      <tbody>${righeHTML(ordina(tutti))}</tbody>
+    </table>
+  </div>
+</div>`;
+
+  container.querySelectorAll('.lista-row').forEach(row => {
+    row.addEventListener('click', () => apriDettaglio(row.dataset.id));
+  });
+  container.querySelector('#lista-cerca').addEventListener('input', appliFiltro);
+  container.querySelector('#lista-stato-filtro').addEventListener('change', appliFiltro);
+}
+
+registerRenderer('lista-pazienti', function() {
+  renderListaPazienti(document.getElementById('view-lista-pazienti'));
+});
+
+// ── Renderer: nuovo paziente (dal lato medico) ────────────────────────────────
+registerRenderer('nuovo', function() {
+  const container = document.getElementById('view-nuovo');
+  const sess = sessionCorrente();
+
+  function mostraConferma(nome, id) {
+    container.innerHTML = `
+      <div class="conferma-box">
+        <div class="icon">✅</div>
+        <h2>Paziente aggiunto</h2>
+        <p><strong>${nome}</strong> è stato aggiunto alla lista e messo in coda.</p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btn-apri-dettaglio">Apri dettaglio</button>
+          <button class="btn" id="btn-altro-paziente">Aggiungi un altro paziente</button>
+        </div>
+      </div>`;
+    container.querySelector('#btn-apri-dettaglio').addEventListener('click', () => apriDettaglio(id));
+    container.querySelector('#btn-altro-paziente').addEventListener('click', () => showView('nuovo'));
+  }
+
+  const wrapper = document.createElement('div');
+  wrapper.style.maxWidth = '720px';
+  const backBtn = document.createElement('button');
+  backBtn.className = 'btn';
+  backBtn.style.marginBottom = '16px';
+  backBtn.textContent = '← Torna alla board';
+  backBtn.onclick = () => showView('board');
+  wrapper.appendChild(backBtn);
+
+  const formEl = document.createElement('div');
+  wrapper.appendChild(formEl);
+  container.innerHTML = '';
+  container.appendChild(wrapper);
+
+  renderAnagrafica(formEl, {
+    paziente: nuovoPaziente(),
+    editable: true,
+    submitLabel: 'Aggiungi e metti in attesa',
+    onSubmit: function(dati) {
+      const salvato = db.savePaziente({
+        ...nuovoPaziente(),
+        ...dati,
+        stato: STATI.IN_ATTESA,
+        medicoAssegnato: sess ? sess.user : null
+      });
+      pushEvento(salvato.id, STATI.REGISTRATO);
+      const nomePaz = nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome || '(senza nome)';
+      mostraConferma(nomePaz, salvato.id);
+    }
+  });
+});
+
+// ── Renderer: da firmare (vista medico) ───────────────────────────────────────
+registerRenderer('da-firmare', function() {
+  const container = document.getElementById('view-da-firmare');
+  const sess = sessionCorrente();
+  const tutti = db.getPazienti();
+
+  // Pazienti Refertati assegnati a me (in attesa di firma consenso paziente)
+  const miei    = tutti.filter(p => p.stato === STATI.REFERTATO && p.medicoAssegnato === (sess && sess.user));
+  // Pazienti con Consenso firmato ma non ancora Completati (da chiudere)
+  const daChiudere = tutti.filter(p => p.stato === STATI.CONSENSO && p.medicoAssegnato === (sess && sess.user));
+  // Tutti i Refertati (inclusi di altri medici, info)
+  const altriMedici = tutti.filter(p =>
+    p.stato === STATI.REFERTATO && p.medicoAssegnato !== (sess && sess.user) && p.medicoAssegnato !== null
+  );
+
+  function rigaRefertato(p, mostraPDF) {
+    const nome   = nomeCompleto(p) || '(senza nome)';
+    const data   = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('it-IT') : '—';
+    const azioni = mostraPDF
+      ? `<button class="btn btn-primary" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>
+         <button class="btn" onclick="event.stopPropagation(); pushEvento('${p.id}', '${STATI.COMPLETATO}'); showView('da-firmare')">Completa</button>`
+      : `<button class="btn" onclick="event.stopPropagation(); generaPDF('${p.id}')">Genera PDF</button>`;
+    return `
+      <div class="board-row" onclick="apriDettaglio('${p.id}')" title="Apri dettaglio">
+        <span class="board-nome">${nome} <span style="font-size:0.8rem;color:var(--txt2);">${data}</span></span>
+        ${badgeStato(p.stato)}
+        <span class="board-azioni">${azioni}</span>
+      </div>`;
+  }
+
+  function gruppo(titolo, lista, mostraPDF) {
+    const righe = lista.length
+      ? lista.map(p => rigaRefertato(p, mostraPDF)).join('')
+      : `<div class="board-empty">Nessun paziente</div>`;
+    return `
+      <div class="board-group">
+        <div class="board-group-title">${titolo} <span class="badge">${lista.length}</span></div>
+        ${righe}
+      </div>`;
+  }
+
+  let html = `
+    <div class="board-wrapper">
+      <div style="margin-bottom:16px;">
+        <h2 style="font-size:1.3rem; font-weight:700; margin:0 0 4px 0;">Referti da firmare</h2>
+        <p style="color:var(--txt2); font-size:0.88rem; margin:0;">Pazienti che devono ancora firmare il consenso al trattamento dei dati.</p>
+      </div>
+      ${gruppo('In attesa di firma del paziente', miei, false)}
+      ${gruppo('Consenso firmato — da completare', daChiudere, true)}`;
+
+  if (altriMedici.length > 0) {
+    html += gruppo('Altri medici (solo info)', altriMedici, false);
+  }
+  html += '</div>';
+  container.innerHTML = html;
+});
+
+// ── Seed dati demo ────────────────────────────────────────────────────────────
+// Popola il localStorage con pazienti demo se è la prima apertura
+(function seedDemoData() {
+  if (db.getPazienti().length > 0) return; // già inizializzato
+
+  const now  = Date.now();
+  const ago  = (min) => new Date(now - min * 60 * 1000).toISOString();
+
+  function crea(anagrafica, stato, medico, minutiFa, referto, firmaConsenso) {
+    const p = nuovoPaziente();
+    p.anagrafica = { ...p.anagrafica, ...anagrafica };
+    p.stato = STATI.REGISTRATO;
+    p.createdAt = ago(minutiFa + 5);
+    p.updatedAt = ago(minutiFa);
+    p.medicoAssegnato = medico || null;
+    p.eventi = [{ stato: STATI.REGISTRATO, ts: ago(minutiFa + 5), utente: 'paziente' }];
+    if (referto) p.referto = { ...p.referto, ...referto };
+    if (firmaConsenso) p.firmaConsenso = firmaConsenso;
+
+    // Simula progressione stati
+    const progressione = {
+      [STATI.REGISTRATO]:  [],
+      [STATI.IN_ATTESA]:   [STATI.IN_ATTESA],
+      [STATI.IN_CORSO]:    [STATI.IN_ATTESA, STATI.IN_CORSO],
+      [STATI.IN_STOP]:     [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.IN_STOP],
+      [STATI.REFERTATO]:   [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.REFERTATO],
+      [STATI.CONSENSO]:    [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.REFERTATO, STATI.CONSENSO],
+      [STATI.COMPLETATO]:  [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.REFERTATO, STATI.CONSENSO, STATI.COMPLETATO]
+    };
+    const passi = progressione[stato] || [];
+    passi.forEach((s, i) => {
+      const utente = (s === STATI.REGISTRATO || s === STATI.CONSENSO) ? 'paziente' : (medico || 'rossi');
+      p.eventi.push({ stato: s, ts: ago(minutiFa - i * 8), utente });
+    });
+    p.stato = stato;
+    db._save([...db.getPazienti(), p]);
+  }
+
+  // Pazienti completati (storico)
+  crea(
+    { cognome: 'Ferrari', nome: 'Giulia', dataNascita: '15/03/1988', sesso: 'F', email: 'giulia.ferrari@email.it', telefono: '339 1234567' },
+    STATI.COMPLETATO, 'rossi', 480,
+    { visusOD: '10/10', visusOS: '9/10', acuitaLontanoOD: '10/10', acuitaLontanoOS: '9/10', diagnosi: 'Lieve miopia OS. Consigliata correzione -0.50.' }
+  );
+  crea(
+    { cognome: 'Martini', nome: 'Luca', dataNascita: '22/07/1975', sesso: 'M', email: 'l.martini@email.it', telefono: '347 9876543' },
+    STATI.COMPLETATO, 'bianchi', 360,
+    { visusOD: '8/10', visusOS: '8/10', pressioneOD: '16', pressioneOS: '15', diagnosi: 'Glaucoma iniziale OD. Terapia topica prescritta.' }
+  );
+  crea(
+    { cognome: 'Romano', nome: 'Sara', dataNascita: '09/11/1992', sesso: 'F', telefono: '333 5551234' },
+    STATI.COMPLETATO, 'rossi', 1440,
+    { visusOD: '10/10', visusOS: '10/10', diagnosi: 'Visita di controllo annuale. Nessuna anomalia.' }
+  );
+
+  // Pazienti con consenso firmato (da completare)
+  crea(
+    { cognome: 'Conti', nome: 'Marco', dataNascita: '30/05/1965', sesso: 'M', email: 'marco.conti@email.it', telefono: '348 7654321' },
+    STATI.CONSENSO, 'bianchi', 45,
+    { visusOD: '7/10', visusOS: '6/10', refOD: { sph: '-2.00', cyl: '-0.75', asse: '90' }, refOS: { sph: '-2.50', cyl: '-0.50', asse: '85' }, diagnosi: 'Miopia bilaterale. Aggiornamento occhiali.' }
+  );
+
+  // Pazienti refertati (in attesa firma paziente)
+  crea(
+    { cognome: 'Esposito', nome: 'Anna', dataNascita: '14/08/1980', sesso: 'F', email: 'anna.esposito@email.it' },
+    STATI.REFERTATO, 'rossi', 30,
+    { visusOD: '10/10', visusOS: '10/10', apo: 'Episodio di congiuntivite 2019.', diagnosi: 'Nella norma. Controllo tra 12 mesi.' }
+  );
+
+  // In corso
+  crea(
+    { cognome: 'Ricci', nome: 'Paolo', dataNascita: '03/02/1958', sesso: 'M', telefono: '347 1112233' },
+    STATI.IN_CORSO, 'rossi', 15
+  );
+
+  // In stop
+  crea(
+    { cognome: 'Lombardi', nome: 'Elena', dataNascita: '27/09/1995', sesso: 'F', email: 'elena.lombardi@email.it' },
+    STATI.IN_STOP, 'bianchi', 20
+  );
+
+  // In attesa
+  crea(
+    { cognome: 'Greco', nome: 'Francesco', dataNascita: '11/04/1970', sesso: 'M' },
+    STATI.IN_ATTESA, null, 10
+  );
+  crea(
+    { cognome: 'Mancini', nome: 'Valentina', dataNascita: '19/12/2000', sesso: 'F', email: 'v.mancini@email.it' },
+    STATI.REGISTRATO, null, 3
+  );
+})();
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 render();
