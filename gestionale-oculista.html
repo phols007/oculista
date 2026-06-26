@@ -1534,6 +1534,10 @@ function renderDettaglio(container, id) {
   } else if (isInStop) {
     azioni += `<button class="btn btn-primary" id="det-btn-riprendi">Riprendi</button> `;
   }
+  // Firma consenso (iPad): se refertato+ ma non ancora firmato
+  if (hasReferto && !p.firmaConsenso) {
+    azioni += `<button class="btn btn-primary" id="det-btn-firma">✍️ Firma consenso (iPad)</button> `;
+  }
   // Genera PDF / Invia email: se refertato+
   if (hasReferto) {
     azioni += `<button class="btn btn-primary" id="det-btn-pdf">Genera PDF</button> `;
@@ -1741,6 +1745,10 @@ function renderDettaglio(container, id) {
   // Invia al paziente via email
   const btnEmail = container.querySelector('#det-btn-email');
   if (btnEmail) btnEmail.onclick = () => inviaRefertoEmail(id);
+
+  // Firma consenso in-room (passa l'iPad al paziente)
+  const btnFirma = container.querySelector('#det-btn-firma');
+  if (btnFirma) btnFirma.onclick = () => apriFirmaConsensoMedico(id);
 
   // Completa
   const btnCompleta = container.querySelector('#det-btn-completa');
@@ -2256,14 +2264,18 @@ function initFirmaCanvas(canvas){
 }
 
 // ── renderConsenso ────────────────────────────────────────────────────────────
-function renderConsenso(container, id) {
+function renderConsenso(container, id, opts = {}) {
   const p = db.getPaziente(id);
   if (!p) { container.innerHTML = '<p>Paziente non trovato.</p>'; return; }
   const nome = nomeCompleto(p) || '(senza nome)';
+  const backLabel = opts.backLabel || '← Torna alla lista';
+  const doneLabel = opts.doneLabel || 'Torna alla lista';
+  const onBack = opts.onBack || (() => showView('firma-consenso'));
+  const onDone = opts.onDone || (() => showView('firma-consenso'));
 
   container.innerHTML = `
 <div style="max-width:700px;">
-  <button class="btn" id="btn-back-consenso" style="margin-bottom:16px;">← Torna alla lista</button>
+  <button class="btn" id="btn-back-consenso" style="margin-bottom:16px;">${backLabel}</button>
 
   <div class="card" style="margin-bottom:20px;">
     <div style="font-size:0.75rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); margin-bottom:4px;">Paziente</div>
@@ -2314,7 +2326,7 @@ function renderConsenso(container, id) {
   });
 
   container.querySelector('#btn-back-consenso').addEventListener('click', () => {
-    showView('firma-consenso');
+    onBack();
   });
 
   btnConferma.addEventListener('click', () => {
@@ -2328,12 +2340,25 @@ function renderConsenso(container, id) {
         <div class="icon">✅</div>
         <h2>Consenso firmato</h2>
         <p>Grazie, <strong>${nome}</strong>. Il consenso è stato registrato correttamente.</p>
-        <button class="btn btn-primary" id="btn-torna-lista">Torna alla lista</button>
+        <button class="btn btn-primary" id="btn-torna-lista">${doneLabel}</button>
       </div>`;
     container.querySelector('#btn-torna-lista').addEventListener('click', () => {
-      showView('firma-consenso');
+      onDone();
     });
   });
+}
+
+// Firma consenso avviata dal medico nel dettaglio: passa l'iPad al paziente,
+// firma del solo paziente corrente (niente lista, niente privacy leak), poi torna al dettaglio.
+function apriFirmaConsensoMedico(id) {
+  const cont = document.getElementById('view-dettaglio');
+  renderConsenso(cont, id, {
+    backLabel: '← Annulla',
+    doneLabel: 'Torna al paziente',
+    onBack: () => renderDettaglio(cont, id),
+    onDone: () => renderDettaglio(cont, id)
+  });
+  showView('dettaglio');
 }
 
 // ── Renderer: vista firma consenso (kiosk paziente) ───────────────────────────
