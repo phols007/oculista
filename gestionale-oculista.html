@@ -393,6 +393,101 @@
       flex-wrap: wrap;
     }
     .ricerca-result-nome { font-weight: 600; font-size: 0.95rem; flex: 1; }
+
+    /* ── Griglia dettaglio (2 colonne → 1 su mobile) ── */
+    .det-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ── Sidebar overlay (chiude il drawer su mobile) ── */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      z-index: 99;
+    }
+    #sidebar-overlay.active { display: block; }
+
+    /* ── Topbar mobile (titolo sezione corrente) ── */
+    #mobile-topbar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: #fff;
+      border-bottom: 1px solid var(--bordo);
+      z-index: 90;
+      align-items: center;
+      padding: 0 16px 0 68px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--txt);
+    }
+
+    /* ── Mobile-only overrides ── */
+    @media (max-width: 820px) {
+      /* Topbar */
+      #mobile-topbar { display: flex; }
+      #main { padding-top: 72px; }
+
+      /* Board row: stack nome sopra, azioni sotto */
+      .board-row {
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        align-items: flex-start;
+      }
+      .board-nome { flex-basis: 100%; }
+      .board-azioni {
+        margin-left: 0;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .board-azioni .btn {
+        flex: 1;
+        min-width: 100px;
+        font-size: 0.82rem;
+        padding: 6px 10px;
+        min-height: 36px;
+        justify-content: center;
+      }
+
+      /* Dettaglio card grids: 1 colonna */
+      .det-grid { grid-template-columns: 1fr; }
+
+      /* Barra azioni dettaglio: bottoni full-width */
+      .barra-azioni {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .barra-azioni .btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+
+      /* Lista pazienti: tabella adattiva */
+      .lista-table .col-hide { display: none; }
+      .lista-table td, .lista-table th { padding: 10px 10px; }
+
+      /* Ricerca: filtro medico a riga intera */
+      #ricerca-medico { width: 100%; }
+
+      /* Form goniometro: uno per riga */
+      .rx-gonio-svg { width: 100%; max-width: 220px; }
+    }
+
+    @media (max-width: 480px) {
+      /* Board: nasconde il badge nel row (visibile nel dettaglio) */
+      .board-badge-hide { display: none; }
+
+      /* Dettaglio header: riduci dimensione ID */
+      .det-header-id { font-size: 1.15rem; }
+    }
   </style>
 </head>
 <body>
@@ -421,7 +516,9 @@
   </div>
 </div>
 
-<button id="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">☰</button>
+<button id="hamburger" aria-label="Menu">☰</button>
+<div id="sidebar-overlay"></div>
+<div id="mobile-topbar"><span id="mobile-topbar-title">Board</span></div>
 
 <div id="app">
   <div id="sidebar">
@@ -763,6 +860,14 @@ function registerRenderer(id, fn) {
   _viewRenderers[id] = fn;
 }
 
+// ── Titoli vista per topbar mobile ───────────────────────────────────────────
+const _VIEW_TITLES = {
+  board: 'Board Pazienti', 'in-attesa': 'In Attesa',
+  'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
+  nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
+  'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione'
+};
+
 // ── showView ──────────────────────────────────────────────────────────────────
 function showView(id, ctx) {
   // Ferma cronometri orfani prima di cambiare vista
@@ -778,8 +883,23 @@ function showView(id, ctx) {
   if (el) el.classList.add('active');
   // Chiama il renderer se registrato
   if (_viewRenderers[id]) _viewRenderers[id](ctx);
-  // Chiudi drawer su mobile
+  // Chiudi drawer su mobile + overlay
+  chiudiSidebar();
+  // Aggiorna titolo topbar mobile
+  const tb = document.getElementById('mobile-topbar-title');
+  if (tb) tb.textContent = _VIEW_TITLES[id] || id;
+}
+
+function chiudiSidebar() {
   document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('active', sidebar.classList.contains('open'));
 }
 
 // ── renderSidebar ─────────────────────────────────────────────────────────────
@@ -857,6 +977,8 @@ function render() {
   app.style.display = '';
   // hamburger tornerà visibile via media query (non forzare display qui)
   hamburger.style.display = '';
+  hamburger.onclick = toggleSidebar;
+  document.getElementById('sidebar-overlay').onclick = chiudiSidebar;
 
   renderSidebar();
 
@@ -1271,7 +1393,7 @@ function renderDettaglio(container, id) {
     cardReferto = `
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Referto</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${refRow('APO', r.apo)}
           ${refRow('APG', r.apg)}
           ${refRow('Annessi', r.annessi)}
@@ -1325,7 +1447,7 @@ function renderDettaglio(container, id) {
       <!-- Riepilogo -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Riepilogo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Paziente', nome)}
           ${campo('Data di nascita', a.dataNascita)}
           ${campo('Codice Fiscale', a.codiceFiscale)}
@@ -1336,7 +1458,7 @@ function renderDettaglio(container, id) {
       <!-- Anagrafica -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Anagrafica</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Cognome', a.cognome)}
           ${campo('Nome', a.nome)}
           ${campo('Data di nascita', a.dataNascita)}
@@ -1353,7 +1475,7 @@ function renderDettaglio(container, id) {
       <!-- Motivo / Anamnesi -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Motivo e Anamnesi</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Motivo visita', motivoVoci.length ? motivoVoci.join('; ') : '—')}
           ${campo('Problemi agli occhi', an.problemiOcchi)}
           ${campo('Quali problemi', an.qualiProblemi)}
@@ -1378,7 +1500,7 @@ function renderDettaglio(container, id) {
       </div>
 
       <!-- Barra azioni -->
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 0 24px;">
+      <div class="barra-azioni" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 0 24px;">
         ${azioni}
       </div>
     </div>`;
@@ -2340,10 +2462,10 @@ function renderListaPazienti(container) {
       return `
         <tr class="lista-row" data-id="${p.id}" title="Apri dettaglio">
           <td style="font-weight:600;">${nome}</td>
-          <td>${data}</td>
-          <td>${medico}</td>
+          <td class="col-hide">${data}</td>
+          <td class="col-hide">${medico}</td>
           <td>${badgeStato(p.stato)}</td>
-          <td>${ultima}</td>
+          <td class="col-hide">${ultima}</td>
         </tr>`;
     }).join('');
   }
@@ -2394,7 +2516,7 @@ function renderListaPazienti(container) {
     <table class="lista-table">
       <thead>
         <tr>
-          <th>Paziente</th><th>Data reg.</th><th>Medico</th><th>Stato</th><th>Ultimo aggiornamento</th>
+          <th>Paziente</th><th class="col-hide">Data reg.</th><th class="col-hide">Medico</th><th>Stato</th><th class="col-hide">Ultimo agg.</th>
         </tr>
       </thead>
       <tbody>${righeHTML(ordina(tutti))}</tbody>
