@@ -664,16 +664,26 @@
     <div id="view-referto" class="view">
       <!-- Populated by renderReferto -->
     </div>
+
+    <div id="view-qr" class="view">
+      <!-- Populated by renderQR -->
+    </div>
   </div>
 </div>
 
 <!-- jsPDF CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- QRCode.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
 <script>
 // ── Costanti ──────────────────────────────────────────────────────────────────
 const LS_KEY = 'oculista_pazienti';
 const SS_KEY = 'oculista_user';
+
+// Medico pre-assegnato quando l'app si apre via QR code (?medico=rossi)
+let _kioscoMedico = new URLSearchParams(window.location.search).get('medico') || null;
+// Valida: deve essere una chiave di UTENTI medico (check dopo init UTENTI)
 
 const STATI = {
   REGISTRATO: 'Registrato',
@@ -691,6 +701,11 @@ const UTENTI = {
   bianchi:  { pass: 'demo', ruolo: 'medico',   nome: 'Dott. Bianchi' },
   paziente: { pass: 'demo', ruolo: 'paziente', nome: 'Paziente' }
 };
+
+// Valida _kioscoMedico: deve essere un medico esistente
+if (_kioscoMedico && (!UTENTI[_kioscoMedico] || UTENTI[_kioscoMedico].ruolo !== 'medico')) {
+  _kioscoMedico = null;
+}
 
 // ── uuid ──────────────────────────────────────────────────────────────────────
 function uuid() {
@@ -943,7 +958,8 @@ const _VIEW_TITLES = {
   board: 'Board Pazienti', 'in-attesa': 'In Attesa',
   'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
   nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
-  'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione'
+  'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione',
+  qr: 'Il mio QR Code'
 };
 
 // Viste "dettaglio" → topbar mostra ← (back) invece di ☰
@@ -1020,6 +1036,9 @@ function renderSidebar() {
 
       <div class="sidebar-title">Referti</div>
       <div class="nav-item" data-view="da-firmare">✍️ Da firmare</div>
+
+      <div class="sidebar-title">Kiosk</div>
+      <div class="nav-item" data-view="qr">📲 Il mio QR</div>
     `;
   } else {
     nav = `
@@ -1030,12 +1049,11 @@ function renderSidebar() {
   }
 
   const footer = `
-    <div style="flex:1;"></div>
     ${sess.ruolo === 'medico' ? `
-    <button onclick="resetDemo()" style="width:100%;padding:8px 12px;border:1px dashed var(--bordo);border-radius:10px;background:none;color:var(--txt2);font-size:0.8rem;cursor:pointer;margin-bottom:8px;text-align:left;">
+    <button onclick="resetDemo()" style="width:100%;padding:8px 12px;border:1px dashed var(--bordo);border-radius:10px;background:none;color:var(--txt2);font-size:0.8rem;cursor:pointer;margin-top:12px;margin-bottom:8px;text-align:left;">
       🔄 Ripristina dati demo
     </button>` : ''}
-    <div class="sidebar-footer">
+    <div class="sidebar-footer" style="margin-top:auto;">
       <div style="display:flex;align-items:center;gap:10px;flex:1;overflow:hidden;">
         <div class="sidebar-avatar">${initial}</div>
         <div style="overflow:hidden;">
@@ -1061,6 +1079,17 @@ function render() {
   const loginView = document.getElementById('view-login');
   const app = document.getElementById('app');
   const hamburger = document.getElementById('hamburger');
+
+  // Modalità kiosk via QR code: salta login, va dritto alla registrazione
+  if (_kioscoMedico && !sess) {
+    loginView.classList.remove('active');
+    app.style.display = '';
+    hamburger.style.display = 'none';
+    document.getElementById('sidebar-overlay').onclick = chiudiSidebar;
+    renderSidebarKiosk();
+    showView('registrazione');
+    return;
+  }
 
   if (!sess) {
     // Mostra login full-screen, nasconde shell
@@ -1092,6 +1121,23 @@ function render() {
   } else {
     showView('registrazione');
   }
+}
+
+// Sidebar minimale per kiosk QR (solo titolo medico, niente logout)
+function renderSidebarKiosk() {
+  const sidebar = document.getElementById('sidebar');
+  const nomeMed = UTENTI[_kioscoMedico] ? UTENTI[_kioscoMedico].nome : _kioscoMedico;
+  sidebar.innerHTML = `
+    <div class="sidebar-header">
+      <div style="font-size:1rem;font-weight:700;color:var(--txt);">👁 Oculistica</div>
+    </div>
+    <div style="padding:12px 8px;border-radius:10px;background:var(--card);margin-top:8px;">
+      <div style="font-size:0.75rem;color:var(--txt2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Medico</div>
+      <div style="font-weight:700;font-size:0.95rem;">${nomeMed}</div>
+    </div>
+    <div style="margin-top:auto;padding-top:16px;font-size:0.78rem;color:var(--txt2);text-align:center;">
+      Kiosk registrazione pazienti
+    </div>`;
 }
 
 // ── Login form handler ────────────────────────────────────────────────────────
@@ -2154,14 +2200,17 @@ registerRenderer('in-attesa', function() {
 // ── Renderer: vista registrazione paziente ────────────────────────────────────
 registerRenderer('registrazione', function() {
   const container = document.getElementById('view-registrazione');
+  const medicoPreassegnato = _kioscoMedico || (sessionCorrente() && sessionCorrente().ruolo === 'paziente' ? null : null);
 
   function mostraConferma(nome) {
+    const nomeMed = medicoPreassegnato && UTENTI[medicoPreassegnato] ? UTENTI[medicoPreassegnato].nome : null;
     container.innerHTML = `
       <div class="conferma-box">
         <div class="icon">✅</div>
         <h2>Registrazione inviata</h2>
         <p>Grazie, <strong>${nome}</strong>. La tua registrazione è stata ricevuta.<br>
-           Attendi di essere chiamato dal medico.</p>
+           ${nomeMed ? `Verrai chiamato dallo <strong>${nomeMed}</strong>.` : 'Attendi di essere chiamato dal medico.'}
+        </p>
         <button class="btn btn-primary" id="btn-nuova-reg">Nuova registrazione</button>
       </div>`;
     container.querySelector('#btn-nuova-reg').addEventListener('click', function() {
@@ -2174,7 +2223,9 @@ registerRenderer('registrazione', function() {
     editable: true,
     submitLabel: 'Invia registrazione',
     onSubmit: function(dati) {
-      const salvato = db.savePaziente({ ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO });
+      const p = { ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO };
+      if (medicoPreassegnato) p.medicoAssegnato = medicoPreassegnato;
+      const salvato = db.savePaziente(p);
       pushEvento(salvato.id, STATI.REGISTRATO);
       mostraConferma(nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
     }
@@ -3038,6 +3089,83 @@ function resetDemo() {
   db.removeAll();
   seedDemoData();
   showView('board');
+}
+
+// ── Renderer: QR code kiosk per il medico ────────────────────────────────────
+registerRenderer('qr', function() {
+  const container = document.getElementById('view-qr');
+  const sess = sessionCorrente();
+  if (!sess || sess.ruolo !== 'medico') return;
+
+  const baseUrl = window.location.href.split('?')[0];
+  const qrUrls = Object.entries(UTENTI)
+    .filter(([, u]) => u.ruolo === 'medico')
+    .map(([key, u]) => ({ key, nome: u.nome, url: baseUrl + '?medico=' + key }));
+
+  container.innerHTML = `
+    <div style="max-width:720px;">
+      <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:6px;">📲 QR Code Kiosk</h2>
+      <p style="color:var(--txt2);font-size:0.9rem;margin-bottom:24px;">
+        Mostra o stampa il tuo QR code. Il paziente lo scansiona con l'iPhone e si apre
+        direttamente il modulo di registrazione pre-assegnato al tuo nome.
+      </p>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        ${qrUrls.map(({ key, nome, url }) => `
+          <div class="card" style="flex:1;min-width:240px;display:flex;flex-direction:column;align-items:center;gap:16px;padding:28px 24px;">
+            <div style="font-weight:700;font-size:1rem;">${nome}</div>
+            <div id="qr-canvas-${key}" style="background:#fff;padding:12px;border-radius:10px;border:1px solid var(--bordo);"></div>
+            <div style="font-size:0.72rem;color:var(--txt2);word-break:break-all;text-align:center;">${url}</div>
+            <button class="btn" onclick="window.open('${url}','_blank')" style="width:100%;">🔗 Apri link</button>
+            <button class="btn" onclick="stampaQR('${key}')" style="width:100%;">🖨 Stampa</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+
+  // Genera QR codes dopo che il DOM è pronto
+  qrUrls.forEach(({ key, url }) => {
+    const el = document.getElementById('qr-canvas-' + key);
+    if (!el) return;
+    if (window.QRCode) {
+      new QRCode(el, {
+        text: url,
+        width: 180,
+        height: 180,
+        colorDark: '#1d1d1f',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } else {
+      // Fallback: mostra placeholder con link se la lib non è caricata
+      el.innerHTML = `
+        <div style="width:180px;height:180px;display:flex;flex-direction:column;align-items:center;
+          justify-content:center;background:var(--card);border-radius:8px;gap:8px;padding:12px;text-align:center;">
+          <div style="font-size:2rem;">📱</div>
+          <div style="font-size:0.72rem;color:var(--txt2);">QR non disponibile offline</div>
+          <a href="${url}" target="_blank" style="font-size:0.7rem;color:var(--blu);word-break:break-all;">${url}</a>
+        </div>`;
+    }
+  });
+});
+
+function stampaQR(medicoKey) {
+  const el = document.getElementById('qr-canvas-' + medicoKey);
+  if (!el) return;
+  const img = el.querySelector('img') || el.querySelector('canvas');
+  if (!img) return;
+  const src = img.tagName === 'CANVAS' ? img.toDataURL() : img.src;
+  const nome = UTENTI[medicoKey] ? UTENTI[medicoKey].nome : medicoKey;
+  const baseUrl = window.location.href.split('?')[0];
+  const url = baseUrl + '?medico=' + medicoKey;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>QR ${nome}</title>
+    <style>body{font-family:system-ui;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;}
+    h2{font-size:1.4rem;}p{font-size:0.85rem;color:#666;}</style></head>
+    <body><h2>👁 Oculistica — ${nome}</h2>
+    <img src="${src}" width="220" height="220" style="border:1px solid #ddd;border-radius:8px;padding:12px;">
+    <p>${url}</p>
+    <script>window.onload=()=>window.print();<\/script></body></html>`);
+  win.document.close();
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
