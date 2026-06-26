@@ -1031,6 +1031,10 @@ function renderSidebar() {
 
   const footer = `
     <div style="flex:1;"></div>
+    ${sess.ruolo === 'medico' ? `
+    <button onclick="resetDemo()" style="width:100%;padding:8px 12px;border:1px dashed var(--bordo);border-radius:10px;background:none;color:var(--txt2);font-size:0.8rem;cursor:pointer;margin-bottom:8px;text-align:left;">
+      🔄 Ripristina dati demo
+    </button>` : ''}
     <div class="sidebar-footer">
       <div style="display:flex;align-items:center;gap:10px;flex:1;overflow:hidden;">
         <div class="sidebar-avatar">${initial}</div>
@@ -2939,8 +2943,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-// Popola il localStorage con pazienti demo se è la prima apertura
-(function seedDemoData() {
+function seedDemoData() {
   if (db.getPazienti().length > 0) return; // già inizializzato
 
   const now  = Date.now();
@@ -3028,9 +3031,17 @@ registerRenderer('da-firmare', function() {
     { cognome: 'Mancini', nome: 'Valentina', dataNascita: '19/12/2000', sesso: 'F', email: 'v.mancini@email.it' },
     STATI.REGISTRATO, null, 3
   );
-})();
+}
+
+function resetDemo() {
+  if (!confirm('Ripristinare i dati demo? Tutti i dati attuali verranno cancellati.')) return;
+  db.removeAll();
+  seedDemoData();
+  showView('board');
+}
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
+seedDemoData();
 render();
 </script>
 </body>
