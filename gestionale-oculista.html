@@ -337,6 +337,62 @@
     .lista-table tbody tr:last-child td { border-bottom: none; }
     .lista-table tbody tr:hover { background: rgba(0,0,0,.04); }
     .lista-table tbody tr { transition: background .12s; }
+
+    /* ── Ricerca (tabs + risultati) ── */
+    .ricerca-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 18px;
+      border-bottom: 1px solid var(--bordo);
+    }
+    .ricerca-tab {
+      padding: 9px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--txt2);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      background: none;
+      border-top: none; border-left: none; border-right: none;
+    }
+    .ricerca-tab.active {
+      color: var(--txt);
+      border-bottom-color: var(--ambra-txt);
+    }
+    .ricerca-tab:hover { color: var(--txt); }
+    .ricerca-hit {
+      background: #fde68a;
+      border-radius: 3px;
+      padding: 0 1px;
+    }
+    .ricerca-snippet {
+      font-size: 0.82rem;
+      color: var(--txt2);
+      margin-top: 2px;
+      line-height: 1.45;
+    }
+    .ricerca-snippet strong { color: var(--txt); font-weight: 600; }
+    .ricerca-empty {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--txt2);
+    }
+    .ricerca-result {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--bordo);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    .ricerca-result:last-child { border-bottom: none; }
+    .ricerca-result:hover { background: rgba(0,0,0,.04); }
+    .ricerca-result-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ricerca-result-nome { font-weight: 600; font-size: 0.95rem; flex: 1; }
   </style>
 </head>
 <body>
@@ -392,6 +448,10 @@
         <h2>Lista Pazienti</h2>
         <p>Archivio pazienti — in costruzione.</p>
       </div>
+    </div>
+
+    <div id="view-ricerca" class="view">
+      <!-- Populated by renderer 'ricerca' -->
     </div>
 
     <div id="view-nuovo" class="view">
@@ -743,6 +803,7 @@ function renderSidebar() {
 
       <div class="sidebar-title">Pazienti</div>
       <div class="nav-item" data-view="lista-pazienti">🗂 Lista</div>
+      <div class="nav-item" data-view="ricerca">🔍 Ricerca</div>
       <div class="nav-item" data-view="nuovo">➕ Nuovo</div>
 
       <div class="sidebar-title">Referti</div>
@@ -2350,6 +2411,190 @@ function renderListaPazienti(container) {
 
 registerRenderer('lista-pazienti', function() {
   renderListaPazienti(document.getElementById('view-lista-pazienti'));
+});
+
+// ── Ricerca (paziente + referto) ──────────────────────────────────────────────
+// Stato di ricerca persistente tra i render (quale tab è attivo)
+let _ricercaTab = 'paziente';
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Evidenzia le occorrenze di `q` in `text` (case-insensitive), già escaped
+function evidenzia(text, q) {
+  const safe = escapeHtml(text);
+  if (!q) return safe;
+  const qEsc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp('(' + qEsc + ')', 'gi'), '<span class="ricerca-hit">$1</span>');
+}
+
+// Estrae uno snippet di contesto attorno alla prima occorrenza di q
+function snippet(text, q, ctx = 40) {
+  const t = String(text || '');
+  if (!q) return escapeHtml(t.slice(0, 120));
+  const i = t.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return escapeHtml(t.slice(0, 120));
+  const start = Math.max(0, i - ctx);
+  const end = Math.min(t.length, i + q.length + ctx);
+  return (start > 0 ? '… ' : '') + evidenzia(t.slice(start, end), q) + (end < t.length ? ' …' : '');
+}
+
+function renderRicerca(container) {
+  function nomeMedico(key) {
+    return key && UTENTI[key] ? UTENTI[key].nome : (key || '—');
+  }
+
+  // ── Ricerca PAZIENTE: cerca su anagrafica + telefono/email/CF/comune ──
+  function cercaPazienti(q) {
+    const query = q.trim().toLowerCase();
+    if (!query) return [];
+    return db.getPazienti().map(p => {
+      const a = p.anagrafica || {};
+      const campi = [
+        ['Nome', nomeCompleto(p)],
+        ['Codice Fiscale', a.codiceFiscale],
+        ['Telefono', a.telefono],
+        ['Email', a.email],
+        ['Comune di nascita', a.comuneNascita],
+        ['Città', a.citta],
+        ['Indirizzo', a.indirizzo]
+      ];
+      const match = campi.find(([, v]) => v && String(v).toLowerCase().includes(query));
+      if (!match) return null;
+      return { p, label: match[0], valore: match[1] };
+    }).filter(Boolean);
+  }
+
+  // ── Ricerca REFERTO: cerca sul contenuto clinico, solo pazienti refertati ──
+  function cercaReferti(q, medicoFiltro) {
+    const query = q.trim().toLowerCase();
+    const refertati = db.getPazienti().filter(p =>
+      p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO || p.stato === STATI.COMPLETATO
+    );
+    return refertati.map(p => {
+      if (medicoFiltro && p.medicoAssegnato !== medicoFiltro) return null;
+      const r = p.referto || {};
+      const campi = [
+        ['Diagnosi e prescrizione', r.diagnosi],
+        ['APO', r.apo], ['APG', r.apg],
+        ['Annessi e segmento anteriore', r.annessi],
+        ['Fundus OD', r.fundusOD], ['Fundus OS', r.fundusOS],
+        ['Altri esami', r.altriEsami],
+        ['Note del medico', r.noteMedico]
+      ];
+      if (!query) {
+        // Nessun testo: mostra tutti (filtrati per medico) con la diagnosi come anteprima
+        return { p, label: 'Diagnosi', valore: r.diagnosi || '(referto senza diagnosi)' };
+      }
+      const match = campi.find(([, v]) => v && String(v).toLowerCase().includes(query));
+      if (!match) return null;
+      return { p, label: match[0], valore: match[1] };
+    }).filter(Boolean);
+  }
+
+  function rigaRisultato(item, q, mostraMedico) {
+    const { p, label, valore } = item;
+    const nome = nomeCompleto(p) || '(senza nome)';
+    const med = mostraMedico ? `<span style="font-size:0.8rem;color:var(--txt2);">${nomeMedico(p.medicoAssegnato)}</span>` : '';
+    return `
+      <div class="ricerca-result" data-id="${p.id}" title="Apri dettaglio">
+        <div class="ricerca-result-head">
+          <span class="ricerca-result-nome">${evidenzia(nome, q)}</span>
+          ${med}
+          ${badgeStato(p.stato)}
+        </div>
+        <div class="ricerca-snippet"><strong>${label}:</strong> ${snippet(valore, q)}</div>
+      </div>`;
+  }
+
+  function eseguiRicerca() {
+    const q = (container.querySelector('#ricerca-input') || {}).value || '';
+    const medicoFiltro = (container.querySelector('#ricerca-medico') || {}).value || '';
+    const box = container.querySelector('#ricerca-risultati');
+    const info = container.querySelector('#ricerca-info');
+    let risultati, mostraMedico;
+
+    if (_ricercaTab === 'paziente') {
+      risultati = cercaPazienti(q);
+      mostraMedico = false;
+      if (!q.trim()) {
+        box.innerHTML = `<div class="ricerca-empty">Digita un nome, codice fiscale, telefono o email per cercare un paziente.</div>`;
+        if (info) info.textContent = '';
+        return;
+      }
+    } else {
+      risultati = cercaReferti(q, medicoFiltro);
+      mostraMedico = true;
+    }
+
+    if (info) info.textContent = risultati.length
+      ? risultati.length + (risultati.length === 1 ? ' risultato' : ' risultati')
+      : '';
+
+    if (risultati.length === 0) {
+      box.innerHTML = `<div class="ricerca-empty">Nessun risultato${q.trim() ? ' per “' + escapeHtml(q.trim()) + '”' : ''}.</div>`;
+      return;
+    }
+    box.innerHTML = risultati.map(item => rigaRisultato(item, q.trim(), mostraMedico)).join('');
+    box.querySelectorAll('.ricerca-result').forEach(el => {
+      el.addEventListener('click', () => apriDettaglio(el.dataset.id));
+    });
+  }
+
+  const placeholderText = _ricercaTab === 'paziente'
+    ? 'Cerca per nome, codice fiscale, telefono, email…'
+    : 'Cerca nel testo del referto (diagnosi, fundus, note…)…';
+
+  const filtroMedico = _ricercaTab === 'referto' ? `
+    <select id="ricerca-medico" style="padding:8px 12px; border:1px solid var(--bordo); border-radius:10px; font-size:0.9rem; background:#fff;">
+      <option value="">Tutti i medici</option>
+      <option value="rossi">Dott. Rossi</option>
+      <option value="bianchi">Dott. Bianchi</option>
+    </select>` : '';
+
+  container.innerHTML = `
+<div style="max-width:820px;">
+  <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+    <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Ricerca</h2>
+    <span id="ricerca-info" style="font-size:0.85rem; color:var(--txt2);"></span>
+  </div>
+
+  <div class="ricerca-tabs">
+    <button class="ricerca-tab ${_ricercaTab === 'paziente' ? 'active' : ''}" data-tab="paziente">👤 Paziente</button>
+    <button class="ricerca-tab ${_ricercaTab === 'referto' ? 'active' : ''}" data-tab="referto">📄 Referto</button>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap;">
+    <input id="ricerca-input" type="search" placeholder="${placeholderText}" autocomplete="off"
+      style="flex:1; min-width:200px; padding:10px 14px; border:1px solid var(--bordo); border-radius:10px; font-size:0.95rem; background:#fff;">
+    ${filtroMedico}
+  </div>
+
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div id="ricerca-risultati"></div>
+  </div>
+</div>`;
+
+  container.querySelectorAll('.ricerca-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      _ricercaTab = tab.dataset.tab;
+      renderRicerca(container);
+    });
+  });
+
+  const input = container.querySelector('#ricerca-input');
+  input.addEventListener('input', eseguiRicerca);
+  const selMedico = container.querySelector('#ricerca-medico');
+  if (selMedico) selMedico.addEventListener('change', eseguiRicerca);
+
+  input.focus();
+  eseguiRicerca(); // mostra stato iniziale (referto: tutti; paziente: hint)
+}
+
+registerRenderer('ricerca', function() {
+  renderRicerca(document.getElementById('view-ricerca'));
 });
 
 // ── Renderer: nuovo paziente (dal lato medico) ────────────────────────────────
