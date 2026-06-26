@@ -587,6 +587,12 @@
         <button type="submit" class="btn btn-primary" style="width:100%;">Accedi</button>
       </div>
     </form>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bordo);font-size:0.78rem;color:var(--txt2);text-align:left;line-height:1.7;">
+      <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:0.7rem;margin-bottom:6px;">Credenziali demo · password <code>demo</code></div>
+      <div>👨‍⚕️ <strong>Medico:</strong> <code>rossi</code> o <code>bianchi</code> — gestione pazienti, refertazione</div>
+      <div>📝 <strong>Accettazione (kiosk):</strong> <code>paziente</code> — registrazione anagrafica</div>
+      <div>✍️ <strong>Postazione firma:</strong> <code>firma-rossi</code> / <code>firma-bianchi</code> — iPad in stanza, mostra il consenso del paziente corrente del medico</div>
+    </div>
   </div>
 </div>
 
@@ -657,6 +663,10 @@
       </div>
     </div>
 
+    <div id="view-firma-kiosk" class="view">
+      <!-- Populated by renderFirmaKiosk (postazione firma per medico) -->
+    </div>
+
     <div id="view-dettaglio" class="view">
       <!-- Populated by apriDettaglio / prendiInCarico fallback -->
     </div>
@@ -699,7 +709,10 @@ const STATI = {
 const UTENTI = {
   rossi:    { pass: 'demo', ruolo: 'medico',   nome: 'Dott. Rossi' },
   bianchi:  { pass: 'demo', ruolo: 'medico',   nome: 'Dott. Bianchi' },
-  paziente: { pass: 'demo', ruolo: 'paziente', nome: 'Paziente' }
+  paziente: { pass: 'demo', ruolo: 'paziente', nome: 'Paziente' },
+  // Postazioni firma consensi: una per medico (iPad in stanza visita)
+  'firma-rossi':   { pass: 'demo', ruolo: 'firma', medico: 'rossi',   nome: 'Firma consensi — Dott. Rossi' },
+  'firma-bianchi': { pass: 'demo', ruolo: 'firma', medico: 'bianchi', nome: 'Firma consensi — Dott. Bianchi' }
 };
 
 // Valida _kioscoMedico: deve essere un medico esistente
@@ -887,7 +900,7 @@ function sessionCorrente() {
 function login(user, pass) {
   const u = UTENTI[user];
   if (!u || u.pass !== pass) return false;
-  sessionStorage.setItem(SS_KEY, JSON.stringify({ user, ruolo: u.ruolo, nome: u.nome }));
+  sessionStorage.setItem(SS_KEY, JSON.stringify({ user, ruolo: u.ruolo, nome: u.nome, medico: u.medico || null }));
   render();
   return true;
 }
@@ -959,7 +972,7 @@ const _VIEW_TITLES = {
   'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
   nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
   'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione',
-  qr: 'Il mio QR Code'
+  'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code'
 };
 
 // Viste "dettaglio" → topbar mostra ← (back) invece di ☰
@@ -968,6 +981,7 @@ const _DETAIL_VIEWS = new Set(['dettaglio', 'referto', 'firma-consenso-paziente'
 // ── showView ──────────────────────────────────────────────────────────────────
 function showView(id, ctx) {
   fermaCronometri();
+  if (typeof fermaFirmaKioskPoll === 'function' && id !== 'firma-kiosk') fermaFirmaKioskPoll();
   document.querySelectorAll('#main .view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('#sidebar .nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.view === id);
@@ -1040,11 +1054,18 @@ function renderSidebar() {
       <div class="sidebar-title">Kiosk</div>
       <div class="nav-item" data-view="qr">📲 Il mio QR</div>
     `;
+  } else if (sess.ruolo === 'firma') {
+    const medNome = UTENTI[sess.medico] ? UTENTI[sess.medico].nome : sess.medico;
+    nav = `
+      <div class="sidebar-title">Postazione firma</div>
+      <div style="padding:10px 12px;background:var(--card);border-radius:10px;font-size:0.85rem;color:var(--txt2);">
+        Consensi di<br><strong style="color:var(--txt);">${medNome}</strong>
+      </div>
+    `;
   } else {
     nav = `
       <div class="sidebar-title">Percorso</div>
       <div class="nav-item" data-view="registrazione">📝 Registrazione</div>
-      <div class="nav-item" data-view="firma-consenso">✅ Firma consenso</div>
     `;
   }
 
@@ -1058,7 +1079,7 @@ function renderSidebar() {
         <div class="sidebar-avatar">${initial}</div>
         <div style="overflow:hidden;">
           <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sess.nome}</div>
-          <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : 'Paziente'}</div>
+          <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : (sess.ruolo === 'firma' ? 'Postazione firma' : 'Paziente')}</div>
         </div>
       </div>
       <button class="sidebar-logout-btn" onclick="logout()" title="Esci">⇥</button>
@@ -1118,6 +1139,8 @@ function render() {
   // Instradamento per ruolo
   if (sess.ruolo === 'medico') {
     showView('board');
+  } else if (sess.ruolo === 'firma') {
+    showView('firma-kiosk');
   } else {
     showView('registrazione');
   }
@@ -2347,6 +2370,58 @@ function renderConsenso(container, id, opts = {}) {
     });
   });
 }
+
+// ── Postazione firma per medico (account firma-<medico>) ──────────────────────
+let _firmaKioskInterval = null;
+function fermaFirmaKioskPoll() { if (_firmaKioskInterval) { clearInterval(_firmaKioskInterval); _firmaKioskInterval = null; } }
+
+function _ultimoEventoTs(p, stato) {
+  const ev = (p.eventi || []).filter(e => e.stato === stato);
+  return ev.length ? ev[ev.length - 1].ts : '';
+}
+// Paziente del medico da far firmare: Refertato e non ancora firmato, il più recente
+function pazienteDaFirmare(medico) {
+  const cand = db.getPazienti().filter(p =>
+    p.medicoAssegnato === medico && p.stato === STATI.REFERTATO && !p.firmaConsenso);
+  cand.sort((a, b) => _ultimoEventoTs(b, STATI.REFERTATO).localeCompare(_ultimoEventoTs(a, STATI.REFERTATO)));
+  return cand[0] || null;
+}
+
+function renderFirmaKiosk() {
+  fermaFirmaKioskPoll();
+  const sess = sessionCorrente();
+  if (!sess || sess.ruolo !== 'firma') return;
+  const medico = sess.medico;
+  const cont = document.getElementById('view-firma-kiosk');
+  const target = pazienteDaFirmare(medico);
+  const medNome = UTENTI[medico] ? UTENTI[medico].nome : medico;
+
+  if (!target) {
+    cont.innerHTML = `
+      <div class="conferma-box">
+        <div class="icon">🪧</div>
+        <h2>Nessun consenso da firmare</h2>
+        <p>Postazione firma di <strong>${(medNome || '').replace('Firma consensi — ', '')}</strong>.<br>
+        In attesa che il medico completi una visita…</p>
+      </div>`;
+    // Poll: appena compare un paziente da firmare, mostra il suo consenso
+    _firmaKioskInterval = setInterval(() => {
+      if (pazienteDaFirmare(medico)) renderFirmaKiosk();
+    }, 2500);
+    return;
+  }
+
+  // Mostra SOLO il consenso del paziente corrente; niente "annulla" (kiosk)
+  renderConsenso(cont, target.id, {
+    backLabel: '',
+    doneLabel: 'Avanti',
+    onBack: () => {},
+    onDone: () => renderFirmaKiosk()
+  });
+  const bb = cont.querySelector('#btn-back-consenso');
+  if (bb) bb.style.display = 'none';
+}
+registerRenderer('firma-kiosk', renderFirmaKiosk);
 
 // Firma consenso avviata dal medico nel dettaglio: passa l'iPad al paziente,
 // firma del solo paziente corrente (niente lista, niente privacy leak), poi torna al dettaglio.
