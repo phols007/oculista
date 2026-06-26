@@ -38,12 +38,13 @@
     }
 
     #sidebar {
-      background: var(--card);
+      background: #fff;
       border-right: 1px solid var(--bordo);
-      padding: 24px 16px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
+      overflow-y: auto;
     }
 
     #main {
@@ -156,31 +157,82 @@
     .btn-primary { background: var(--txt); color: #fff; border-color: transparent; }
 
     /* ── Timeline ── */
-    .timeline { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-    .timeline li { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--txt2); }
-    .timeline li::before { content: '○'; font-size: 1rem; flex-shrink: 0; }
-    .timeline .done    { color: var(--txt); }
-    .timeline .done::before  { content: '●'; color: var(--verde); }
-    .timeline .current { color: var(--txt); font-weight: 600; }
-    .timeline .current::before { content: '◉'; color: var(--ambra-txt); }
+    /* ── Timeline (stile reference) ── */
+    .timeline { list-style: none; display: flex; flex-direction: column; }
+    .timeline-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding-bottom: 18px;
+      position: relative;
+    }
+    .timeline-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 24px;
+      bottom: 0;
+      width: 2px;
+      background: var(--bordo);
+    }
+    .timeline-dot {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .timeline-dot.done    { background: var(--verde); }
+    .timeline-dot.current { background: var(--ambra); border: 2px solid var(--ambra-txt); color: var(--ambra-txt); }
+    .timeline-content { padding-top: 2px; }
+    .timeline-stato  { font-size: 0.9rem; font-weight: 600; color: var(--txt); }
+    .timeline-meta   { font-size: 0.78rem; color: var(--txt2); margin-top: 2px; }
 
-    /* ── Hamburger (mobile) ── */
-    #hamburger {
+    /* ── Sidebar header / close / avatar ── */
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .sidebar-close-btn {
       display: none;
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 200;
-      background: var(--card);
+      width: 36px; height: 36px;
+      border-radius: 8px;
       border: 1px solid var(--bordo);
-      border-radius: 10px;
-      width: 44px;
-      height: 44px;
+      background: none;
+      cursor: pointer;
       align-items: center;
       justify-content: center;
-      font-size: 1.4rem;
-      cursor: pointer;
+      font-size: 1rem;
+      color: var(--txt2);
     }
+    .sidebar-avatar {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--verde);
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .sidebar-logout-btn {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--bordo);
+      background: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      color: var(--txt2);
+      flex-shrink: 0;
+    }
+    .sidebar-logout-btn:hover { background: rgba(255,59,48,.08); color: var(--rosso); }
+
+    /* ── Hamburger esterno (nascosto — ora è dentro #mobile-topbar) ── */
+    #hamburger { display: none !important; }
 
     /* ── Responsive drawer ── */
     @media (max-width: 820px) {
@@ -217,7 +269,7 @@
       transition: background .15s;
     }
     .nav-item:hover  { background: rgba(0,0,0,.05); }
-    .nav-item.active { background: var(--txt); color: #fff; }
+    .nav-item.active { background: rgba(52,199,89,.12); color: var(--verde-pieno); font-weight: 600; }
 
     .sidebar-title {
       font-size: 0.7rem;
@@ -393,6 +445,123 @@
       flex-wrap: wrap;
     }
     .ricerca-result-nome { font-weight: 600; font-size: 0.95rem; flex: 1; }
+
+    /* ── Griglia dettaglio (2 colonne → 1 su mobile) ── */
+    .det-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ── Sidebar overlay (chiude il drawer su mobile) ── */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      z-index: 99;
+    }
+    #sidebar-overlay.active { display: block; }
+
+    /* ── Topbar mobile ── */
+    #mobile-topbar {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 56px;
+      background: #fff;
+      border-bottom: 1px solid var(--bordo);
+      z-index: 90;
+      align-items: center;
+      padding: 0 8px;
+      gap: 4px;
+    }
+    #mobile-topbar-left {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      color: var(--txt);
+      flex-shrink: 0;
+    }
+    #mobile-topbar-left:hover { background: rgba(0,0,0,.06); }
+    #mobile-topbar-title {
+      flex: 1;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--txt);
+    }
+    #mobile-topbar-right {
+      width: 44px; height: 44px;
+      flex-shrink: 0;
+    }
+
+    /* ── Mobile-only overrides ── */
+    @media (max-width: 820px) {
+      /* Topbar */
+      #mobile-topbar { display: flex; }
+      #main { padding: 16px; padding-top: 72px; }
+      .sidebar-close-btn { display: flex; }
+
+      /* Board row: stack nome sopra, azioni sotto */
+      .board-row {
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        align-items: flex-start;
+      }
+      .board-nome { flex-basis: 100%; }
+      .board-azioni {
+        margin-left: 0;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .board-azioni .btn {
+        flex: 1;
+        min-width: 100px;
+        font-size: 0.82rem;
+        padding: 6px 10px;
+        min-height: 36px;
+        justify-content: center;
+      }
+
+      /* Dettaglio card grids: 1 colonna */
+      .det-grid { grid-template-columns: 1fr; }
+
+      /* Barra azioni dettaglio: bottoni full-width */
+      .barra-azioni {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .barra-azioni .btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+
+      /* Lista pazienti: tabella adattiva */
+      .lista-table .col-hide { display: none; }
+      .lista-table td, .lista-table th { padding: 10px 10px; }
+
+      /* Ricerca: filtro medico a riga intera */
+      #ricerca-medico { width: 100%; }
+
+      /* Form goniometro: uno per riga */
+      .rx-gonio-svg { width: 100%; max-width: 220px; }
+    }
+
+    @media (max-width: 480px) {
+      /* Board: nasconde il badge nel row (visibile nel dettaglio) */
+      .board-badge-hide { display: none; }
+
+      /* Dettaglio header: riduci dimensione ID */
+      .det-header-id { font-size: 1.15rem; }
+    }
   </style>
 </head>
 <body>
@@ -421,7 +590,13 @@
   </div>
 </div>
 
-<button id="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')" aria-label="Menu">☰</button>
+<button id="hamburger" aria-label="Menu">☰</button>
+<div id="sidebar-overlay"></div>
+<div id="mobile-topbar">
+  <button id="mobile-topbar-left" aria-label="Menu">☰</button>
+  <span id="mobile-topbar-title">Board</span>
+  <div id="mobile-topbar-right"></div>
+</div>
 
 <div id="app">
   <div id="sidebar">
@@ -763,23 +938,54 @@ function registerRenderer(id, fn) {
   _viewRenderers[id] = fn;
 }
 
+// ── Titoli vista per topbar mobile ───────────────────────────────────────────
+const _VIEW_TITLES = {
+  board: 'Board Pazienti', 'in-attesa': 'In Attesa',
+  'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
+  nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
+  'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione'
+};
+
+// Viste "dettaglio" → topbar mostra ← (back) invece di ☰
+const _DETAIL_VIEWS = new Set(['dettaglio', 'referto', 'firma-consenso-paziente']);
+
 // ── showView ──────────────────────────────────────────────────────────────────
 function showView(id, ctx) {
-  // Ferma cronometri orfani prima di cambiare vista
   fermaCronometri();
-  // Toglie active da tutte le .view dentro #main
   document.querySelectorAll('#main .view').forEach(v => v.classList.remove('active'));
-  // Aggiorna active nella sidebar
   document.querySelectorAll('#sidebar .nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.view === id);
   });
-  // Mostra la vista richiesta
   const el = document.getElementById('view-' + id);
   if (el) el.classList.add('active');
-  // Chiama il renderer se registrato
   if (_viewRenderers[id]) _viewRenderers[id](ctx);
-  // Chiudi drawer su mobile
+  chiudiSidebar();
+  // Topbar: titolo
+  const tb = document.getElementById('mobile-topbar-title');
+  if (tb) tb.textContent = _VIEW_TITLES[id] || id;
+  // Topbar: pulsante sinistra
+  const leftBtn = document.getElementById('mobile-topbar-left');
+  if (leftBtn) {
+    if (_DETAIL_VIEWS.has(id)) {
+      leftBtn.textContent = '←';
+      leftBtn.onclick = () => showView('board');
+    } else {
+      leftBtn.textContent = '☰';
+      leftBtn.onclick = toggleSidebar;
+    }
+  }
+}
+
+function chiudiSidebar() {
   document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('active', sidebar.classList.contains('open'));
 }
 
 // ── renderSidebar ─────────────────────────────────────────────────────────────
@@ -792,9 +998,15 @@ function renderSidebar() {
     return;
   }
 
-  const logo = `<div style="font-size:1.1rem; font-weight:700; padding:4px 12px 16px;">👁 Oculistica</div>`;
-  let nav = '';
+  const initial = (sess.nome || '?')[0].toUpperCase();
 
+  const header = `
+    <div class="sidebar-header">
+      <div style="font-size:1rem; font-weight:700; color:var(--txt);">👁 Oculistica</div>
+      <button class="sidebar-close-btn" onclick="chiudiSidebar()" aria-label="Chiudi menu">×</button>
+    </div>`;
+
+  let nav = '';
   if (sess.ruolo === 'medico') {
     nav = `
       <div class="sidebar-title">Lavoro</div>
@@ -819,13 +1031,23 @@ function renderSidebar() {
 
   const footer = `
     <div style="flex:1;"></div>
+    ${sess.ruolo === 'medico' ? `
+    <button onclick="resetDemo()" style="width:100%;padding:8px 12px;border:1px dashed var(--bordo);border-radius:10px;background:none;color:var(--txt2);font-size:0.8rem;cursor:pointer;margin-bottom:8px;text-align:left;">
+      🔄 Ripristina dati demo
+    </button>` : ''}
     <div class="sidebar-footer">
-      <span class="sidebar-footer-name">${sess.nome}</span>
-      <button class="btn btn-danger" style="min-height:36px; padding:0 12px; font-size:0.82rem;" onclick="logout()">Esci</button>
+      <div style="display:flex;align-items:center;gap:10px;flex:1;overflow:hidden;">
+        <div class="sidebar-avatar">${initial}</div>
+        <div style="overflow:hidden;">
+          <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sess.nome}</div>
+          <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : 'Paziente'}</div>
+        </div>
+      </div>
+      <button class="sidebar-logout-btn" onclick="logout()" title="Esci">⇥</button>
     </div>
   `;
 
-  sidebar.innerHTML = logo + nav + footer;
+  sidebar.innerHTML = header + nav + footer;
 
   // Riattacca listener click sulle voci nav
   sidebar.querySelectorAll('.nav-item[data-view]').forEach(el => {
@@ -857,6 +1079,10 @@ function render() {
   app.style.display = '';
   // hamburger tornerà visibile via media query (non forzare display qui)
   hamburger.style.display = '';
+  hamburger.onclick = toggleSidebar; // rimane per retrocompat.
+  const topbarLeft = document.getElementById('mobile-topbar-left');
+  if (topbarLeft) topbarLeft.onclick = toggleSidebar;
+  document.getElementById('sidebar-overlay').onclick = chiudiSidebar;
 
   renderSidebar();
 
@@ -1190,8 +1416,18 @@ function renderTimeline(eventi) {
   const items = eventi.map((ev, i) => {
     const isCurrent = i === eventi.length - 1;
     const cls = isCurrent ? 'current' : 'done';
-    const data = new Date(ev.ts).toLocaleString('it-IT');
-    return `<li class="${cls}">${ev.stato} &mdash; ${data} &mdash; ${ev.utente}</li>`;
+    const dot = isCurrent ? '' : '✓';
+    const data = new Date(ev.ts).toLocaleString('it-IT', {
+      day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+    return `
+      <li class="timeline-item ${cls}">
+        <div class="timeline-dot ${cls}">${dot}</div>
+        <div class="timeline-content">
+          <div class="timeline-stato">${ev.stato}</div>
+          <div class="timeline-meta">${data} — ${ev.utente}</div>
+        </div>
+      </li>`;
   }).join('');
   return `<ul class="timeline">${items}</ul>`;
 }
@@ -1271,7 +1507,7 @@ function renderDettaglio(container, id) {
     cardReferto = `
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Referto</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${refRow('APO', r.apo)}
           ${refRow('APG', r.apg)}
           ${refRow('Annessi', r.annessi)}
@@ -1325,7 +1561,7 @@ function renderDettaglio(container, id) {
       <!-- Riepilogo -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Riepilogo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Paziente', nome)}
           ${campo('Data di nascita', a.dataNascita)}
           ${campo('Codice Fiscale', a.codiceFiscale)}
@@ -1336,7 +1572,7 @@ function renderDettaglio(container, id) {
       <!-- Anagrafica -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Anagrafica</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Cognome', a.cognome)}
           ${campo('Nome', a.nome)}
           ${campo('Data di nascita', a.dataNascita)}
@@ -1353,7 +1589,7 @@ function renderDettaglio(container, id) {
       <!-- Motivo / Anamnesi -->
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Motivo e Anamnesi</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="det-grid">
           ${campo('Motivo visita', motivoVoci.length ? motivoVoci.join('; ') : '—')}
           ${campo('Problemi agli occhi', an.problemiOcchi)}
           ${campo('Quali problemi', an.qualiProblemi)}
@@ -1378,7 +1614,7 @@ function renderDettaglio(container, id) {
       </div>
 
       <!-- Barra azioni -->
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 0 24px;">
+      <div class="barra-azioni" style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:16px 0 24px;">
         ${azioni}
       </div>
     </div>`;
@@ -2340,10 +2576,10 @@ function renderListaPazienti(container) {
       return `
         <tr class="lista-row" data-id="${p.id}" title="Apri dettaglio">
           <td style="font-weight:600;">${nome}</td>
-          <td>${data}</td>
-          <td>${medico}</td>
+          <td class="col-hide">${data}</td>
+          <td class="col-hide">${medico}</td>
           <td>${badgeStato(p.stato)}</td>
-          <td>${ultima}</td>
+          <td class="col-hide">${ultima}</td>
         </tr>`;
     }).join('');
   }
@@ -2394,7 +2630,7 @@ function renderListaPazienti(container) {
     <table class="lista-table">
       <thead>
         <tr>
-          <th>Paziente</th><th>Data reg.</th><th>Medico</th><th>Stato</th><th>Ultimo aggiornamento</th>
+          <th>Paziente</th><th class="col-hide">Data reg.</th><th class="col-hide">Medico</th><th>Stato</th><th class="col-hide">Ultimo agg.</th>
         </tr>
       </thead>
       <tbody>${righeHTML(ordina(tutti))}</tbody>
@@ -2707,8 +2943,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-// Popola il localStorage con pazienti demo se è la prima apertura
-(function seedDemoData() {
+function seedDemoData() {
   if (db.getPazienti().length > 0) return; // già inizializzato
 
   const now  = Date.now();
@@ -2796,9 +3031,17 @@ registerRenderer('da-firmare', function() {
     { cognome: 'Mancini', nome: 'Valentina', dataNascita: '19/12/2000', sesso: 'F', email: 'v.mancini@email.it' },
     STATI.REGISTRATO, null, 3
   );
-})();
+}
+
+function resetDemo() {
+  if (!confirm('Ripristinare i dati demo? Tutti i dati attuali verranno cancellati.')) return;
+  db.removeAll();
+  seedDemoData();
+  showView('board');
+}
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
+seedDemoData();
 render();
 </script>
 </body>
