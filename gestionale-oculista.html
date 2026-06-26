@@ -1579,13 +1579,25 @@ function renderDettaglio(container, id) {
 
   // Card consenso
   let cardConsenso = '';
-  if (p.firmaConsenso) {
-    cardConsenso = `
+  {
+    const evF = (p.eventi || []).slice().reverse().find(e => e.stato === STATI.CONSENSO);
+    const dataFirma = evF ? new Date(evF.ts).toLocaleDateString('it-IT') : '';
+    const head = (badge) => `<div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);display:flex;justify-content:space-between;align-items:center;gap:8px;"><span>Consenso trattamento dati</span>${badge}</div>`;
+    if (p.firmaConsenso) {
+      const badge = `<span style="background:#e6f7ed;color:#1e7e45;padding:3px 10px;border-radius:999px;font-size:0.72rem;letter-spacing:0;text-transform:none;white-space:nowrap;">✓ Firmato${dataFirma ? ' · ' + dataFirma : ''}</span>`;
+      cardConsenso = `
       <div class="card" style="margin-bottom:16px;">
-        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Consenso GDPR</div>
+        ${head(badge)}
         <img src="${p.firmaConsenso}" alt="Firma consenso" style="max-width:240px;border:1px solid var(--bordo);border-radius:8px;background:#fff;display:block;">
-        <div style="font-size:0.8rem;color:var(--txt2);margin-top:6px;">Firma apposta</div>
       </div>`;
+    } else {
+      const badge = `<span style="background:var(--ambra);color:var(--ambra-txt);padding:3px 10px;border-radius:999px;font-size:0.72rem;letter-spacing:0;text-transform:none;white-space:nowrap;">⚠ Da firmare</span>`;
+      cardConsenso = `
+      <div class="card" style="margin-bottom:16px;">
+        ${head(badge)}
+        <div style="font-size:0.85rem;color:var(--txt2);">Il paziente non ha ancora firmato il consenso al trattamento dei dati personali e sanitari.</div>
+      </div>`;
+    }
   }
 
   container.innerHTML = `
@@ -2994,7 +3006,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v3'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v4'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -3083,6 +3095,25 @@ function seedDemoData() {
       + pick('ABCDEFGHIJKLMNOPRSTUVZ').toUpperCase();
   }
 
+  // Firma finta deterministica (scarabocchio su canvas) per i consensi storici
+  function firmaFinta() {
+    const c = document.createElement('canvas'); c.width = 240; c.height = 80;
+    const ctx = c.getContext('2d');
+    ctx.strokeStyle = '#1a3a6b'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let x = 14; const yMid = 48;
+    ctx.moveTo(x, yMid);
+    const segs = rndInt(5, 9);
+    for (let i = 0; i < segs; i++) {
+      const cx1 = x + rndInt(8, 20), cy1 = yMid - rndInt(0, 28);
+      const cx2 = x + rndInt(20, 36), cy2 = yMid + rndInt(0, 28);
+      x += rndInt(22, 38);
+      ctx.bezierCurveTo(cx1, cy1, cx2, cy2, x, yMid + rndInt(-8, 8));
+    }
+    ctx.stroke();
+    return c.toDataURL('image/png');
+  }
+
   function crea(anagrafica, stato, medico, minutiFa, referto) {
     const p = nuovoPaziente();
     p.anagrafica = { ...p.anagrafica, ...anagrafica };
@@ -3107,6 +3138,8 @@ function seedDemoData() {
       p.eventi.push({ stato: s, ts: ago(minutiFa - i * 8), utente: s === STATI.CONSENSO ? 'paziente' : medico });
     });
     p.stato = stato;
+    // Consenso firmato per gli stati che lo prevedono (consenso firmato / completato)
+    if (stato === STATI.CONSENSO || stato === STATI.COMPLETATO) p.firmaConsenso = firmaFinta();
     db._save([...db.getPazienti(), p]);
   }
 
