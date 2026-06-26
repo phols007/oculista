@@ -2994,24 +2994,106 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
+const SEED_VERSION = 'v3'; // incrementa per forzare reset automatico
+
 function seedDemoData() {
-  if (db.getPazienti().length > 0) return; // già inizializzato
+  if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
+  db.removeAll();
 
-  const now  = Date.now();
-  const ago  = (min) => new Date(now - min * 60 * 1000).toISOString();
+  // Generatore pseudo-casuale deterministico (stesso seed = stessi pazienti)
+  let _rng = 42;
+  function rand() { _rng = (_rng * 1664525 + 1013904223) & 0xffffffff; return ((_rng >>> 0) / 0xffffffff); }
+  function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
+  function rndInt(min, max) { return min + Math.floor(rand() * (max - min + 1)); }
 
-  function crea(anagrafica, stato, medico, minutiFa, referto, firmaConsenso) {
+  const COGNOMI = ['Ferrari','Russo','Esposito','Bianchi','Romano','Colombo','Ricci','Marino',
+    'Greco','Bruno','Gallo','Conti','De Luca','Mancini','Costa','Giordano','Rizzo','Lombardi',
+    'Moreno','Barbieri','Fontana','Santoro','Mariani','Rinaldi','Caruso','Ferretti','Leone',
+    'Monti','Serra','Coppola','Pellegrini','Ferraro','Cattaneo','Fabbri','Martini','Gentile',
+    'Basile','Marchetti','Parisi','Palumbo','Sorrentino','Amato','Sanna','Farina','Benedetti',
+    'Testa','Villa','Longo','Giuliani','De Angelis','Silvestri','Neri','Vitale','Orlando',
+    'Ferrara','Gatti','Donati','Sartori','Carbone','Fiore','Bernardi','Piras','Rosati'];
+  const NOMI_M = ['Marco','Luca','Andrea','Giovanni','Roberto','Francesco','Stefano','Angelo',
+    'Paolo','Davide','Antonio','Matteo','Giuseppe','Fabio','Claudio','Sergio','Mario','Alberto',
+    'Simone','Daniele','Michele','Giorgio','Luigi','Carlo','Massimo','Filippo','Lorenzo',
+    'Emanuele','Nicola','Alessandro','Giacomo','Federico','Riccardo','Enrico','Cristian'];
+  const NOMI_F = ['Maria','Anna','Laura','Sara','Elena','Giulia','Chiara','Valentina','Francesca',
+    'Paola','Silvia','Alessandra','Monica','Roberta','Federica','Cristina','Manuela','Barbara',
+    'Rossella','Giovanna','Daniela','Sabrina','Raffaella','Claudia','Patrizia','Teresa','Elisa',
+    'Nadia','Cinzia','Marta','Irene','Serena','Beatrice','Veronica','Ilaria'];
+
+  const DIAGNOSI = [
+    'Miopia lieve OD -0.75 sph. Consigliata correzione.',
+    'Ipermetropia bilaterale +1.50 sph. Prescritti occhiali da lettura.',
+    'Astigmatismo misto OS. Aggiornamento correzione.',
+    'Glaucoma iniziale OD. Avviata terapia topica con beta-bloccante.',
+    'Cataratta corticale lieve OS. Monitoraggio semestrale.',
+    'Congiuntivite allergica stagionale. Terapia antistaminica topica.',
+    'Presbiopia. Prescrizione progressivi.',
+    'Visita di controllo annuale. Refrazione invariata. Nessuna anomalia.',
+    'Degenerazione maculare senile iniziale. Supplementazione vitaminica.',
+    'Strabismo convergente residuo. Controllo ortottico.',
+    'Occhio secco moderato. Sostituzione lacrime artificiali.',
+    'Ptosi palpebrale destra lieve. Valutazione chirurgica differita.',
+    'Uveite anteriore in remissione. Continuare cortisone topico a scalare.',
+    'Retinopatia diabetica non proliferativa lieve. Controllo trimestrale.',
+    'Neurite ottica. Inviato a neurologo per approfondimento RMN.',
+    'Distacco posteriore di vitreo. Rassicurato. Controllo se floaters aumentano.',
+    'Cheratocono iniziale OD. Consigliato cross-linking corneale.',
+    'Post-operatorio faco+IOL OS a 30 gg. Decorso regolare.',
+    'Ambliopia OD in trattamento. Terapia occlusiva continuata.',
+    'Pressione intraoculare borderline (21 mmHg OD). Tonometria di controllo.'
+  ];
+
+  const MOTIVI = [
+    { controllo: true },
+    { prescrizione: true },
+    { disturbi: 'Visione offuscata da lontano' },
+    { disturbi: 'Mal di testa in lettura' },
+    { disturbi: 'Bruciore e lacrimazione' },
+    { altro: 'Post-operatorio' },
+    { controllo: true, prescrizione: true }
+  ];
+
+  const now = Date.now();
+  const ago = (min) => new Date(now - min * 60 * 1000).toISOString();
+  const agoD = (days) => ago(days * 1440);
+
+  function dataNascita() {
+    const y = rndInt(1940, 2005);
+    const m = String(rndInt(1,12)).padStart(2,'0');
+    const d = String(rndInt(1,28)).padStart(2,'0');
+    return `${d}/${m}/${y}`;
+  }
+  function telefono() {
+    const prefix = pick(['333','339','347','348','340','328','388','366','349']);
+    return `${prefix} ${rndInt(1000000,9999999)}`;
+  }
+  function email(nome, cognome) {
+    const sep = pick(['.','_','']);
+    return `${nome.toLowerCase()}${sep}${cognome.toLowerCase()}@${pick(['gmail.com','email.it','libero.it','yahoo.it','hotmail.it'])}`;
+  }
+  function cf(sesso, dn) {
+    const parts = dn.split('/');
+    return `${pick('ABCDEFGHIJKLMNOPRSTUVZ')}${pick('AEIOU')}${pick('BCDFGLMNPRSTVZ')}`.toUpperCase()
+      + pick('ABCDEFGHIJKLMNOPRSTUVZ').toUpperCase()
+      + pick('AEIOU').toUpperCase() + pick('BCDFGLMNPRSTVZ').toUpperCase()
+      + parts[2].slice(2) + (sesso==='M'?pick('ABCDEHLMPRST'):pick('ABCDEHLMPRST'))
+      + String(rndInt(10,31)).padStart(2,'0') + String(rndInt(100,999))
+      + pick('ABCDEFGHIJKLMNOPRSTUVZ').toUpperCase();
+  }
+
+  function crea(anagrafica, stato, medico, minutiFa, referto) {
     const p = nuovoPaziente();
     p.anagrafica = { ...p.anagrafica, ...anagrafica };
     p.stato = STATI.REGISTRATO;
     p.createdAt = ago(minutiFa + 5);
     p.updatedAt = ago(minutiFa);
-    p.medicoAssegnato = medico || null;
+    p.medicoAssegnato = medico;
+    p.motivo = pick(MOTIVI);
     p.eventi = [{ stato: STATI.REGISTRATO, ts: ago(minutiFa + 5), utente: 'paziente' }];
     if (referto) p.referto = { ...p.referto, ...referto };
-    if (firmaConsenso) p.firmaConsenso = firmaConsenso;
 
-    // Simula progressione stati
     const progressione = {
       [STATI.REGISTRATO]:  [],
       [STATI.IN_ATTESA]:   [STATI.IN_ATTESA],
@@ -3021,71 +3103,103 @@ function seedDemoData() {
       [STATI.CONSENSO]:    [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.REFERTATO, STATI.CONSENSO],
       [STATI.COMPLETATO]:  [STATI.IN_ATTESA, STATI.IN_CORSO, STATI.REFERTATO, STATI.CONSENSO, STATI.COMPLETATO]
     };
-    const passi = progressione[stato] || [];
-    passi.forEach((s, i) => {
-      const utente = (s === STATI.REGISTRATO || s === STATI.CONSENSO) ? 'paziente' : (medico || 'rossi');
-      p.eventi.push({ stato: s, ts: ago(minutiFa - i * 8), utente });
+    (progressione[stato] || []).forEach((s, i) => {
+      p.eventi.push({ stato: s, ts: ago(minutiFa - i * 8), utente: s === STATI.CONSENSO ? 'paziente' : medico });
     });
     p.stato = stato;
     db._save([...db.getPazienti(), p]);
   }
 
-  // Pazienti completati (storico)
-  crea(
-    { cognome: 'Ferrari', nome: 'Giulia', dataNascita: '15/03/1988', sesso: 'F', email: 'giulia.ferrari@email.it', telefono: '339 1234567' },
-    STATI.COMPLETATO, 'rossi', 480,
-    { visusOD: '10/10', visusOS: '9/10', acuitaLontanoOD: '10/10', acuitaLontanoOS: '9/10', diagnosi: 'Lieve miopia OS. Consigliata correzione -0.50.' }
-  );
-  crea(
-    { cognome: 'Martini', nome: 'Luca', dataNascita: '22/07/1975', sesso: 'M', email: 'l.martini@email.it', telefono: '347 9876543' },
-    STATI.COMPLETATO, 'bianchi', 360,
-    { visusOD: '8/10', visusOS: '8/10', pressioneOD: '16', pressioneOS: '15', diagnosi: 'Glaucoma iniziale OD. Terapia topica prescritta.' }
-  );
-  crea(
-    { cognome: 'Romano', nome: 'Sara', dataNascita: '09/11/1992', sesso: 'F', telefono: '333 5551234' },
-    STATI.COMPLETATO, 'rossi', 1440,
-    { visusOD: '10/10', visusOS: '10/10', diagnosi: 'Visita di controllo annuale. Nessuna anomalia.' }
-  );
+  // Genera pazienti per un medico
+  function generaPerMedico(medicoKey, offset) {
+    const sessi = ['M','F'];
+    let idx = 0;
 
-  // Pazienti con consenso firmato (da completare)
-  crea(
-    { cognome: 'Conti', nome: 'Marco', dataNascita: '30/05/1965', sesso: 'M', email: 'marco.conti@email.it', telefono: '348 7654321' },
-    STATI.CONSENSO, 'bianchi', 45,
-    { visusOD: '7/10', visusOS: '6/10', refOD: { sph: '-2.00', cyl: '-0.75', asse: '90' }, refOS: { sph: '-2.50', cyl: '-0.50', asse: '85' }, diagnosi: 'Miopia bilaterale. Aggiornamento occhiali.' }
-  );
+    function prossimo() {
+      const sesso = sessi[idx % 2 === 0 ? (rand() > 0.5 ? 0 : 1) : (rand() > 0.5 ? 0 : 1)];
+      const nomi = sesso === 'M' ? NOMI_M : NOMI_F;
+      const nome = pick(nomi);
+      const cognome = pick(COGNOMI);
+      const dn = dataNascita();
+      const conEmail = rand() > 0.35;
+      const conTel = rand() > 0.25;
+      return {
+        cognome, nome, sesso, dataNascita: dn,
+        codiceFiscale: rand() > 0.4 ? cf(sesso, dn) : '',
+        email: conEmail ? email(nome, cognome) : '',
+        telefono: conTel ? telefono() : ''
+      };
+    }
 
-  // Pazienti refertati (in attesa firma paziente)
-  crea(
-    { cognome: 'Esposito', nome: 'Anna', dataNascita: '14/08/1980', sesso: 'F', email: 'anna.esposito@email.it' },
-    STATI.REFERTATO, 'rossi', 30,
-    { visusOD: '10/10', visusOS: '10/10', apo: 'Episodio di congiuntivite 2019.', diagnosi: 'Nella norma. Controllo tra 12 mesi.' }
-  );
+    function refertoCasuale() {
+      const d = pick(DIAGNOSI);
+      const vis = () => `${rndInt(7,10)}/10`;
+      const sph = () => (rand()>0.5?'+':'-') + rndInt(0,4) + '.' + pick(['00','25','50','75']);
+      const cyl = () => '-' + rndInt(0,2) + '.' + pick(['00','25','50','75']);
+      const asse = () => String(rndInt(0,180));
+      const pres = () => String(rndInt(12,22));
+      return {
+        acuitaLontanoOD: vis(), acuitaLontanoOS: vis(),
+        acuitaVicinoOD: vis(), acuitaVicinoOS: vis(),
+        refOD: { sph: sph(), cyl: cyl(), asse: asse() },
+        refOS: { sph: sph(), cyl: cyl(), asse: asse() },
+        pressioneOD: pres(), pressioneOS: pres(),
+        diagnosi: d
+      };
+    }
 
-  // In corso
-  crea(
-    { cognome: 'Ricci', nome: 'Paolo', dataNascita: '03/02/1958', sesso: 'M', telefono: '347 1112233' },
-    STATI.IN_CORSO, 'rossi', 15
-  );
+    // 70 completati (storico, da mesi/anni fa)
+    for (let i = 0; i < 70; i++) {
+      const daysAgo = rndInt(10, 730);
+      crea(prossimo(), STATI.COMPLETATO, medicoKey, daysAgo * 1440 + offset + i, refertoCasuale());
+      idx++;
+    }
 
-  // In stop
-  crea(
-    { cognome: 'Lombardi', nome: 'Elena', dataNascita: '27/09/1995', sesso: 'F', email: 'elena.lombardi@email.it' },
-    STATI.IN_STOP, 'bianchi', 20
-  );
+    // 10 refertati (da firmare)
+    for (let i = 0; i < 10; i++) {
+      crea(prossimo(), STATI.REFERTATO, medicoKey, rndInt(30, 480) + offset + i * 7, refertoCasuale());
+      idx++;
+    }
 
-  // In attesa
-  crea(
-    { cognome: 'Greco', nome: 'Francesco', dataNascita: '11/04/1970', sesso: 'M' },
-    STATI.IN_ATTESA, null, 10
-  );
-  crea(
-    { cognome: 'Mancini', nome: 'Valentina', dataNascita: '19/12/2000', sesso: 'F', email: 'v.mancini@email.it' },
-    STATI.REGISTRATO, null, 3
-  );
+    // 5 consenso firmato (da completare)
+    for (let i = 0; i < 5; i++) {
+      crea(prossimo(), STATI.CONSENSO, medicoKey, rndInt(20, 120) + offset + i * 5, refertoCasuale());
+      idx++;
+    }
+
+    // 2 in corso
+    for (let i = 0; i < 2; i++) {
+      crea(prossimo(), STATI.IN_CORSO, medicoKey, rndInt(5, 30) + i * 3);
+      idx++;
+    }
+
+    // 1 in stop
+    crea(prossimo(), STATI.IN_STOP, medicoKey, rndInt(10, 40));
+    idx++;
+
+    // 7 in attesa
+    for (let i = 0; i < 7; i++) {
+      crea(prossimo(), STATI.IN_ATTESA, medicoKey, rndInt(5, 60) + i * 2);
+      idx++;
+    }
+
+    // 5 registrati (appena arrivati)
+    for (let i = 0; i < 5; i++) {
+      crea(prossimo(), STATI.REGISTRATO, medicoKey, rndInt(1, 15) + i);
+      idx++;
+    }
+    // Totale: 70+10+5+2+1+7+5 = 100 per medico
+  }
+
+  generaPerMedico('rossi', 0);
+  generaPerMedico('bianchi', 1000);
+
+  localStorage.setItem('oculista_seed', SEED_VERSION);
 }
 
 function resetDemo() {
   if (!confirm('Ripristinare i dati demo? Tutti i dati attuali verranno cancellati.')) return;
+  localStorage.removeItem('oculista_seed');
   db.removeAll();
   seedDemoData();
   showView('board');
