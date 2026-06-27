@@ -1,0 +1,10 @@
+# Configurazione deploy Netlify — sito statico, nessuna build
+[build]
+  publish = "."
+  command = ""
+
+# Serve il gestionale direttamente sulla root (rewrite, URL pulito)
+[[redirects]]
+  from = "/"
+  to = "/gestionale-oculista.html"
+  status = 200
