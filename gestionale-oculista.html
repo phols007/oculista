@@ -340,6 +340,59 @@
       font-size: 0.9rem;
     }
 
+    /* ── Board v2: colonne flat minimali ── */
+    .bd2-summary {
+      display: flex; align-items: baseline; gap: 22px;
+      padding-bottom: 16px; margin-bottom: 18px;
+      border-bottom: 1px solid var(--bordo);
+    }
+    .bd2-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; }
+    .bd2-counts { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+    .bd2-counts span { font-size: 0.86rem; color: var(--txt2); white-space: nowrap; }
+    .bd2-counts b { font-size: 1.05rem; font-weight: 700; color: var(--txt); margin-right: 4px; font-variant-numeric: tabular-nums; }
+    .bd2-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; align-items: start; }
+    .bd2-cols-single { grid-template-columns: 1fr; max-width: 520px; }
+    .bd2-col { padding: 0 16px; border-right: 1px solid var(--bordo); min-width: 0; }
+    .bd2-col:first-child { padding-left: 0; }
+    .bd2-col:last-child { border-right: none; padding-right: 0; }
+    .bd2-col-head { display: flex; align-items: center; gap: 7px; padding-bottom: 12px; margin-bottom: 4px; }
+    .bd2-cdot { width: 7px; height: 7px; border-radius: 50%; background: #a1a1a6; flex-shrink: 0; }
+    .bd2-cdot.corso { background: var(--verde); }
+    .bd2-cdot.stop { background: #e0b94e; }
+    .bd2-cdot.compl { background: #7da7d9; }
+    .bd2-cname { font-size: 0.76rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--txt2); }
+    .bd2-cn { font-size: 0.76rem; font-weight: 700; color: #a1a1a6; margin-left: auto; font-variant-numeric: tabular-nums; }
+    .bd2-row {
+      position: relative; display: flex; align-items: center; gap: 10px;
+      padding: 9px 6px; border-radius: 8px; cursor: pointer; transition: background .12s;
+    }
+    .bd2-row:hover { background: var(--card); }
+    .bd2-rail { width: 3px; align-self: stretch; border-radius: 3px; background: transparent; flex-shrink: 0; }
+    .bd2-rail.warn { background: #e0b94e; }
+    .bd2-rail.urg { background: var(--rosso); }
+    .bd2-nome { font-size: 0.9rem; font-weight: 600; flex: 1; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bd2-time { font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--txt2); white-space: nowrap; }
+    .bd2-time.warn { color: var(--ambra-txt); font-weight: 600; }
+    .bd2-time.urg { color: var(--rosso); font-weight: 600; }
+    .bd2-info { font-size: 0.78rem; color: var(--txt2); white-space: nowrap; }
+    .bd2-quick {
+      position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+      font-size: 0.78rem; font-weight: 600; padding: 4px 10px; border-radius: 7px;
+      border: 1px solid var(--bordo); background: #fff; color: var(--txt); cursor: pointer;
+      opacity: 0; pointer-events: none; transition: opacity .12s; white-space: nowrap;
+    }
+    .bd2-row:hover .bd2-quick { opacity: 1; pointer-events: auto; }
+    .bd2-row:hover .bd2-time, .bd2-row:hover .bd2-info { opacity: 0; }
+    .bd2-empty { font-size: 0.82rem; color: #a1a1a6; padding: 10px 6px; }
+    @media (max-width: 820px) {
+      .bd2-cols { grid-template-columns: 1fr; gap: 22px; }
+      .bd2-col { padding: 0; border-right: none; }
+      .bd2-counts { gap: 12px; }
+      /* su mobile niente hover: azioni sempre visibili, tempo accanto */
+      .bd2-quick { position: static; transform: none; opacity: 1; pointer-events: auto; margin-left: 6px; }
+      .bd2-row:hover .bd2-time, .bd2-row:hover .bd2-info { opacity: 1; }
+    }
+
     /* ── Placeholder ── */
     .placeholder {
       text-align: center;
@@ -951,13 +1004,47 @@ function formatDurata(ms) {
   return `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
+// ts di ingresso nello stato corrente del paziente (per il timer in board)
+function inizioStatoCorrente(p) {
+  if (!p || !p.eventi || !p.eventi.length) return p && p.createdAt ? p.createdAt : null;
+  for (let i = p.eventi.length - 1; i >= 0; i--) {
+    if (p.eventi[i].stato === p.stato) return p.eventi[i].ts;
+  }
+  return p.eventi[p.eventi.length - 1].ts || p.createdAt || null;
+}
+
+// minuti interi trascorsi da un timestamp ISO
+function minutiDa(ts) {
+  return Math.max(0, Math.floor((Date.now() - Date.parse(ts)) / 60000));
+}
+
+// formato compatto per la board: "8m" oppure "1h 05m"
+function formatMin(min) {
+  if (min < 60) return min + 'm';
+  return Math.floor(min / 60) + 'h ' + String(min % 60).padStart(2, '0') + 'm';
+}
+
 let cronoInterval = null;
 
 function avviaCronometri() {
   if (cronoInterval) return;
   function tick() {
+    // Cronometro pausa (dettaglio)
     document.querySelectorAll('[data-stop-since]').forEach(el => {
       el.textContent = formatDurata(Date.now() - Date.parse(el.dataset.stopSince));
+    });
+    // Timer board (attesa / corso / stop)
+    document.querySelectorAll('[data-wait-since]').forEach(el => {
+      const min = minutiDa(el.dataset.waitSince);
+      el.textContent = formatMin(min);
+      if (el.dataset.thresh === '1') {
+        const lvl = min > 15 ? 'urg' : min > 5 ? 'warn' : '';
+        el.classList.remove('warn', 'urg');
+        if (lvl) el.classList.add(lvl);
+        const row = el.closest('.bd2-row');
+        const rail = row && row.querySelector('.bd2-rail');
+        if (rail) { rail.classList.remove('warn', 'urg'); if (lvl) rail.classList.add(lvl); }
+      }
     });
   }
   tick();
@@ -1838,78 +1925,94 @@ function renderBoard(container, filtroSoloAttesa) {
     p.stato === STATI.IN_STOP && p.medicoAssegnato === me
   );
 
-  // Refertati/Consenso/Completati: assegnati a me
+  // Da completare: solo Refertati (da firmare) e Consenso firmato (da chiudere).
+  // I Completati sono storico → vivono nella Lista, non affollano la board.
   const postVisita = tutti.filter(p =>
-    (p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO || p.stato === STATI.COMPLETATO) &&
+    (p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO) &&
     p.medicoAssegnato === me
   );
 
-  function rigaPaziente(p) {
-    const nome = nomeCompleto(p) || '(senza nome)';
-    const isAttesa = p.stato === STATI.REGISTRATO || p.stato === STATI.IN_ATTESA;
-    const isInCorso = p.stato === STATI.IN_CORSO;
-    const isInStop  = p.stato === STATI.IN_STOP;
-    const isPostVisita = p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO || p.stato === STATI.COMPLETATO;
+  // Ordina la coda d'attesa: chi aspetta da più tempo in alto
+  inAttesa.sort((a, b) => Date.parse(inizioStatoCorrente(a)) - Date.parse(inizioStatoCorrente(b)));
 
-    let azioni = '';
-    if (isAttesa) {
-      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); prendiInCarico('${p.id}')">Prendi in carico</button>`;
-    } else if (isInCorso) {
-      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>
-                <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_STOP}')">In stop</button>`;
-    } else if (isInStop) {
-      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>
-                <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
-    } else if (isPostVisita) {
-      azioni = `<button class="btn btn-primary" onclick="event.stopPropagation(); generaPDF('${p.id}')">Genera PDF</button>`;
-      if (p.stato !== STATI.COMPLETATO) {
-        azioni += ` <button class="btn" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.COMPLETATO}')">Completa</button>`;
-      }
+  // Riga compatta stile V2. `tipo` ∈ attesa|corso|stop|compl
+  function rigaPaziente(p, tipo) {
+    const nome = escapeHtml(nomeCompleto(p) || '(senza nome)');
+    const since = inizioStatoCorrente(p);
+    let destra = '', quick = '';
+
+    if (tipo === 'attesa') {
+      const min = minutiDa(since);
+      const lvl = min > 15 ? 'urg' : min > 5 ? 'warn' : '';
+      destra = `<span class="bd2-time ${lvl}" data-wait-since="${since}" data-thresh="1">${formatMin(min)}</span>`;
+      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); prendiInCarico('${p.id}')">Prendi in carico</button>`;
+    } else if (tipo === 'corso') {
+      destra = `<span class="bd2-time" data-wait-since="${since}" data-thresh="0">${formatMin(minutiDa(since))}</span>`;
+      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>`;
+    } else if (tipo === 'stop') {
+      destra = `<span class="bd2-info">pausa · <span class="bd2-time" data-wait-since="${since}" data-thresh="0">${formatMin(minutiDa(since))}</span></span>`;
+      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
+    } else { // compl
+      const info = p.stato === STATI.REFERTATO ? 'da firmare'
+                 : p.stato === STATI.CONSENSO  ? 'da chiudere'
+                 : 'completato';
+      destra = `<span class="bd2-info">${info}</span>`;
+      quick = p.stato === STATI.COMPLETATO
+        ? `<button class="bd2-quick" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>`
+        : `<button class="bd2-quick" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.COMPLETATO}')">Completa</button>`;
     }
 
-    const cronoHtml = isInStop
-      ? ` <span style="font-size:0.82rem;color:var(--txt2);">In pausa da <span class="crono" data-stop-since="${inizioStop(p)}"></span></span>`
-      : '';
-
     return `
-      <div class="board-row" onclick="apriDettaglio('${p.id}')" title="Apri dettaglio">
-        <span class="board-nome">${nome}${cronoHtml}</span>
-        ${badgeStato(p.stato)}
-        <span class="board-azioni">${azioni}</span>
+      <div class="bd2-row" onclick="apriDettaglio('${p.id}')" title="${nome}">
+        <span class="bd2-rail"></span>
+        <span class="bd2-nome">${nome}</span>
+        ${destra}${quick}
       </div>`;
   }
 
-  function gruppo(titolo, lista) {
+  function colonna(titolo, lista, tipo, dotCls) {
     const righe = lista.length
-      ? lista.map(rigaPaziente).join('')
-      : `<div class="board-empty">Nessun paziente</div>`;
+      ? lista.map(p => rigaPaziente(p, tipo)).join('')
+      : `<div class="bd2-empty">Nessun paziente</div>`;
     return `
-      <div class="board-group">
-        <div class="board-group-title">${titolo} <span class="badge">${lista.length}</span></div>
+      <div class="bd2-col">
+        <div class="bd2-col-head">
+          <span class="bd2-cdot ${dotCls}"></span>
+          <span class="bd2-cname">${titolo}</span>
+          <span class="bd2-cn">${lista.length}</span>
+        </div>
         ${righe}
       </div>`;
   }
 
-  let html = '<div class="board-wrapper">';
+  const totali = inAttesa.length + inCorso.length + inStop.length + postVisita.length;
+  const summary = `
+    <div class="bd2-summary">
+      <span class="bd2-title">${filtroSoloAttesa ? 'In attesa' : 'Sala d\'attesa'}</span>
+      <div class="bd2-counts">
+        <span><b>${inAttesa.length}</b>in attesa</span>
+        ${filtroSoloAttesa ? '' : `
+        <span><b>${inCorso.length}</b>in corso</span>
+        <span><b>${inStop.length}</b>in stop</span>
+        <span><b>${postVisita.length}</b>da completare</span>`}
+      </div>
+    </div>`;
+
+  let html = summary + `<div class="bd2-cols${filtroSoloAttesa ? ' bd2-cols-single' : ''}">`;
   if (filtroSoloAttesa) {
-    html += gruppo('In attesa', inAttesa);
+    html += colonna('In attesa', inAttesa, 'attesa', '');
   } else {
-    html += gruppo('In attesa', inAttesa);
-    html += gruppo('In corso', inCorso);
-    html += gruppo('In stop', inStop);
-    html += gruppo('Refertati / Da completare', postVisita);
+    html += colonna('In attesa', inAttesa, 'attesa', '');
+    html += colonna('In corso', inCorso, 'corso', 'corso');
+    html += colonna('In stop', inStop, 'stop', 'stop');
+    html += colonna('Da completare', postVisita, 'compl', 'compl');
   }
   html += '</div>';
 
-  // Sostituisce solo il contenuto della vista (non il wrapper .view)
-  if (container.id && container.id.startsWith('view-')) {
-    container.innerHTML = html;
-  } else {
-    container.innerHTML = html;
-  }
+  container.innerHTML = html;
 
-  // Avvia cronometri se ci sono pazienti in pausa
-  if (container.querySelector('[data-stop-since]')) avviaCronometri();
+  // Timer dal vivo (attesa/corso/stop) e cronometro pausa
+  if (container.querySelector('[data-wait-since], [data-stop-since]')) avviaCronometri();
 }
 
 // ── apriDettaglio ─────────────────────────────────────────────────────────────
