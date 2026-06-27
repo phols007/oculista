@@ -1,4 +1,5 @@
 # Configurazione deploy Netlify — sito statico, nessuna build
+# Test deploy continuo da repo privato: 2026-06-27
 [build]
   publish = "."
   command = ""
