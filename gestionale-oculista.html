@@ -122,6 +122,20 @@
       .lg-watermark { font-size: 56vh; right: -12vw; }
     }
 
+    /* ── Home (landing con tavola ottotipica) ── */
+    #view-home { position: fixed; inset: 0; display: none; z-index: 300; }
+    #view-home.active { display: block; }
+    .hm-root { min-height: 100vh; display: flex; flex-direction: column; background: radial-gradient(120% 90% at 78% 8%, #faf9f6 0%, #f4f3f0 46%, #eeece6 100%); color: #16150f; overflow: hidden; position: relative; font-family: 'Geist', system-ui, sans-serif; }
+    .hm-header { display: flex; align-items: center; justify-content: space-between; padding: 26px 48px; position: relative; z-index: 5; flex-wrap: wrap; gap: 12px; }
+    .hm-nav { display: flex; align-items: center; gap: 30px; }
+    .hm-hero { flex: 1; display: grid; grid-template-columns: 1.02fr 1.1fr; align-items: center; gap: 56px; padding: 24px 48px 56px; position: relative; max-width: 1500px; width: 100%; margin: 0 auto; }
+    @media (max-width: 900px) {
+      .hm-header { padding: 18px 24px; }
+      .hm-nav { gap: 16px; }
+      .hm-nav .hm-navlink { display: none; }
+      .hm-hero { grid-template-columns: 1fr; gap: 30px; padding: 8px 24px 40px; }
+    }
+
     /* ── Card ── */
     .card {
       background: var(--card);
@@ -643,6 +657,7 @@
         <span class="lg-brand-name">Studio Medico</span>
         <span class="lg-brand-sub">· Oculistica</span>
       </div>
+      <span onclick="tornaAllaHome()" style="display:inline-flex; align-items:center; gap:9px; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;"><span>←</span> Torna alla home</span>
     </header>
 
     <main class="lg-main">
@@ -680,6 +695,82 @@
     <!-- palpebre: partono chiuse, si aprono al caricamento -->
     <div class="lg-eyelid top closed" id="eyelidTop"></div>
     <div class="lg-eyelid bot closed" id="eyelidBot"></div>
+  </div>
+</div>
+
+<!-- Home (landing con tavola ottotipica interattiva) -->
+<div id="view-home">
+  <div class="hm-root">
+    <header class="hm-header">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span style="font-family:'Geist Mono',monospace; font-size:13px; letter-spacing:.2em; text-transform:uppercase; font-weight:500;">Studio Medico</span>
+        <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#a6a49b;">· Oculistica</span>
+      </div>
+      <nav class="hm-nav">
+        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Lo studio</span>
+        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Prestazioni</span>
+        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Contatti</span>
+        <span onclick="vaiAlLogin()" style="display:inline-flex; align-items:center; gap:8px; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#16150f; border:1px solid #cfcdc4; border-radius:999px; padding:9px 16px; cursor:pointer;">Area riservata <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      </nav>
+    </header>
+
+    <main class="hm-hero" id="hm-hero">
+      <div id="hm-heroText" style="will-change:transform;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:26px; animation:focusIn .9s .15s both;">
+          <span style="display:inline-block; width:42px; height:1px; background:#16150f; transform-origin:left; animation:hairline .8s .2s both;"></span>
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#6c6b63;">Studio oculistico · su appuntamento</span>
+        </div>
+        <h1 style="font-family:'Instrument Serif',serif; font-weight:400; font-size:clamp(48px,6vw,90px); line-height:.98; letter-spacing:-.015em; margin-bottom:24px;">
+          <span style="display:block; animation:focusIn 1s .28s both;">Mettere a fuoco</span>
+          <span style="display:block; font-style:italic; color:#54534b; animation:focusIn 1s .42s both;">ciò che conta.</span>
+        </h1>
+        <p style="font-size:16.5px; line-height:1.6; color:#54534b; max-width:42ch; margin-bottom:34px; animation:focusIn 1s .56s both;">Visite oculistiche, diagnostica avanzata e chirurgia refrattiva. Uno sguardo esperto per restituire nitidezza alla tua giornata.</p>
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:40px; animation:focusIn 1s .68s both; flex-wrap:wrap;">
+          <span onclick="vaiAlLogin()" style="display:inline-flex; align-items:center; gap:10px; background:#16150f; color:#f4f3f0; font-size:14px; font-weight:500; padding:14px 24px; border-radius:999px; cursor:pointer;">Area riservata <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          <span style="display:inline-flex; align-items:center; gap:9px; font-size:14px; color:#16150f; padding:14px 6px;">Scopri lo studio <span style="font-family:'Geist Mono',monospace; color:#a6a49b;">→</span></span>
+        </div>
+        <div style="display:flex; align-items:center; gap:18px; animation:focusIn 1s .82s both; flex-wrap:wrap;">
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#a6a49b;">Lun–Ven · 9–19</span>
+          <span style="width:4px; height:4px; border-radius:50%; background:#cfcdc4;"></span>
+          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#a6a49b;">Diagnostica in sede</span>
+        </div>
+      </div>
+
+      <div id="hm-snellen" style="position:relative; background:#fbfbf9; border:1px solid #e2e0d8; border-radius:8px; box-shadow:0 1px 0 #ffffff inset, 0 40px 80px -50px rgba(20,18,12,.4); padding:34px 40px 30px; --mx:50%; --my:42%; --lens:150px; --lin:90px;">
+        <span style="position:absolute; top:14px; left:14px; width:14px; height:14px; border-top:1px solid #cfcdc4; border-left:1px solid #cfcdc4;"></span>
+        <span style="position:absolute; top:14px; right:14px; width:14px; height:14px; border-top:1px solid #cfcdc4; border-right:1px solid #cfcdc4;"></span>
+        <span style="position:absolute; bottom:14px; left:14px; width:14px; height:14px; border-bottom:1px solid #cfcdc4; border-left:1px solid #cfcdc4;"></span>
+        <span style="position:absolute; bottom:14px; right:14px; width:14px; height:14px; border-bottom:1px solid #cfcdc4; border-right:1px solid #cfcdc4;"></span>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:#a6a49b;">Tavola ottotipica</span>
+          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#a6a49b;">Distanza 6 m</span>
+        </div>
+
+        <div id="hm-chartInner" style="position:relative; will-change:transform;">
+          <div id="hm-chartSharp">
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .25s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(64px,8.5vw,116px); letter-spacing:.16em; line-height:.9; color:#16150f;">E</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/200</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .37s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(44px,5.6vw,76px); letter-spacing:.2em; line-height:.9; color:#16150f;">F P</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/100</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .49s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(33px,4.2vw,55px); letter-spacing:.22em; line-height:.9; color:#16150f;">T O Z</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/70</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .61s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(26px,3.2vw,42px); letter-spacing:.24em; line-height:.9; color:#16150f;">L P E D</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/50</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .73s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(21px,2.5vw,33px); letter-spacing:.26em; line-height:.9; color:#16150f;">P E C F D</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/40</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .85s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(16px,1.9vw,26px); letter-spacing:.28em; line-height:.9; color:#16150f;">E D F C Z P</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/30</span></div>
+            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:9px 0 4px; animation:focusIn .9s .97s both;"><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.06em; color:#16150f;">10/10</span><span style="text-align:center; font-weight:700; font-size:clamp(13px,1.5vw,20px); letter-spacing:.3em; line-height:.9; color:#16150f;">F E L O P Z D</span><span style="display:inline-flex; align-items:center; justify-content:flex-end; gap:5px; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#16150f; text-align:right;"><span style="width:5px; height:5px; border-radius:50%; background:#16150f;"></span>20/20</span></div>
+          </div>
+          <div id="hm-chartBlur" style="position:absolute; inset:0; opacity:0; transition:opacity .9s ease; pointer-events:none; filter:blur(5px); -webkit-mask-image:radial-gradient(circle at var(--mx) var(--my), transparent 0, transparent var(--lin), #000 var(--lens)); mask-image:radial-gradient(circle at var(--mx) var(--my), transparent 0, transparent var(--lin), #000 var(--lens));"></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:9px; margin-top:18px; padding-top:16px; border-top:1px solid #eceae6;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a6a49b" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.08em; color:#a6a49b;">Muovi il mouse sulla tavola per mettere a fuoco</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- palpebre della home -->
+    <div class="lg-eyelid top closed" id="hmEyelidTop"></div>
+    <div class="lg-eyelid bot closed" id="hmEyelidBot"></div>
   </div>
 </div>
 
@@ -1253,22 +1344,20 @@ function render() {
   }
 
   if (!sess) {
-    // Mostra login full-screen, nasconde shell
-    loginView.classList.add('active');
+    // Ingresso pubblico: Home con tavola ottotipica, poi → login
     app.style.display = 'none';
     hamburger.style.display = 'none';
-    // Pulisce sidebar
     renderSidebar();
-    // Svuota errore al ritorno
     const le = document.getElementById('login-error');
     if (le) { le.textContent = ''; le.style.opacity = '0'; }
-    // Animazione: palpebre che si aprono come un occhio
-    apriPalpebre();
+    mostraHome();
     return;
   }
 
-  // Loggato: nasconde login, mostra shell
+  // Loggato: nasconde login e home, mostra shell
   loginView.classList.remove('active');
+  const homeView = document.getElementById('view-home');
+  if (homeView) homeView.classList.remove('active');
   app.style.display = '';
   // hamburger tornerà visibile via media query (non forzare display qui)
   hamburger.style.display = '';
@@ -1332,6 +1421,104 @@ function chiudiPalpebre() {
 function toggleLoginPass() {
   const inp = document.getElementById('login-pass');
   if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ── Home: tavola ottotipica interattiva (lente di messa a fuoco) ───────────────
+let _homeInited = false;
+function initHomeChart() {
+  if (_homeInited) return;
+  const card = document.getElementById('hm-snellen');
+  const sharp = document.getElementById('hm-chartSharp');
+  const blur = document.getElementById('hm-chartBlur');
+  const inner = document.getElementById('hm-chartInner');
+  const hero = document.getElementById('hm-hero');
+  const heroText = document.getElementById('hm-heroText');
+  if (!card || !sharp || !blur) return;
+  _homeInited = true;
+
+  // duplica la tavola in versione sfocata (senza animazioni)
+  blur.innerHTML = sharp.innerHTML;
+  blur.querySelectorAll('*').forEach(el => { el.style.animation = 'none'; el.style.opacity = '1'; el.style.filter = 'none'; el.style.transform = 'none'; });
+
+  sharp.style.transition = 'opacity .9s ease';
+  const SHARP_MASK = 'radial-gradient(circle at var(--mx) var(--my), #000 0, #000 var(--lin), transparent var(--lens))';
+  // dopo l'intro a fuoco, attiva la "lente": nitido dentro, sfocato/sbiadito fuori
+  setTimeout(() => {
+    sharp.style.webkitMaskImage = SHARP_MASK;
+    sharp.style.maskImage = SHARP_MASK;
+    blur.style.opacity = '0.5';
+  }, 2150);
+
+  let tx = .5, ty = .42, cx = .5, cy = .42, ptx = 0, pty = 0, pcx = 0, pcy = 0;
+  const onMove = (e) => {
+    const pt = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    const r = card.getBoundingClientRect();
+    tx = Math.min(1, Math.max(0, (pt.clientX - r.left) / r.width));
+    ty = Math.min(1, Math.max(0, (pt.clientY - r.top) / r.height));
+    const vr = hero.getBoundingClientRect();
+    ptx = (pt.clientX - vr.left) / vr.width - .5;
+    pty = (pt.clientY - vr.top) / vr.height - .5;
+  };
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: true });
+
+  const loop = () => {
+    cx += (tx - cx) * .12; cy += (ty - cy) * .12;
+    pcx += (ptx - pcx) * .07; pcy += (pty - pcy) * .07;
+    card.style.setProperty('--mx', (cx * 100).toFixed(2) + '%');
+    card.style.setProperty('--my', (cy * 100).toFixed(2) + '%');
+    if (inner) inner.style.transform = 'translate(' + (pcx * 16).toFixed(1) + 'px,' + (pcy * 12).toFixed(1) + 'px)';
+    if (heroText) heroText.style.transform = 'translate(' + (-pcx * 10).toFixed(1) + 'px,' + (-pcy * 8).toFixed(1) + 'px)';
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+
+function apriPalpebreHome() {
+  const t = document.getElementById('hmEyelidTop');
+  const b = document.getElementById('hmEyelidBot');
+  if (!t || !b) return;
+  t.classList.remove('open'); t.classList.add('closed');
+  b.classList.remove('open'); b.classList.add('closed');
+  void t.offsetWidth;
+  setTimeout(() => {
+    t.classList.remove('closed'); t.classList.add('open');
+    b.classList.remove('closed'); b.classList.add('open');
+  }, 180);
+}
+function chiudiPalpebreHome() {
+  const t = document.getElementById('hmEyelidTop');
+  const b = document.getElementById('hmEyelidBot');
+  if (!t || !b) return;
+  t.classList.remove('open'); t.classList.add('closed');
+  b.classList.remove('open'); b.classList.add('closed');
+}
+
+function mostraHome() {
+  const l = document.getElementById('view-login'); if (l) l.classList.remove('active');
+  const h = document.getElementById('view-home'); if (h) h.classList.add('active');
+  initHomeChart();
+  apriPalpebreHome();
+}
+
+// Home → Login (blink palpebre)
+function vaiAlLogin() {
+  chiudiPalpebreHome();
+  setTimeout(() => {
+    const h = document.getElementById('view-home'); if (h) h.classList.remove('active');
+    const l = document.getElementById('view-login'); if (l) l.classList.add('active');
+    const le = document.getElementById('login-error'); if (le) { le.textContent = ''; le.style.opacity = '0'; }
+    apriPalpebre();
+  }, 700);
+}
+
+// Login → Home (blink palpebre)
+function tornaAllaHome() {
+  chiudiPalpebre();
+  setTimeout(() => {
+    const l = document.getElementById('view-login'); if (l) l.classList.remove('active');
+    mostraHome();
+  }, 700);
 }
 
 // ── Login form handler ────────────────────────────────────────────────────────
