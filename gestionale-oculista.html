@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Gestionale Oculistico</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     /* ── Token CSS "Demo Laboratorio" ── */
     :root {
@@ -56,58 +59,67 @@
     .view { display: none; }
     .view.active { display: block; }
 
-    /* ── Login view (full screen, covers the shell) ── */
-    #view-login {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      z-index: 300;
+    /* ── Login view — design "occhio che si apre" ── */
+    #view-login { position: fixed; inset: 0; display: none; z-index: 300; }
+    #view-login.active { display: block; }
+    .lg-root {
+      min-height: 100vh; display: flex; flex-direction: column;
+      background: radial-gradient(120% 90% at 50% 0%, #faf9f6 0%, #f4f3f0 50%, #eeece6 100%);
+      color: #16150f; position: relative; overflow: hidden;
+      font-family: 'Geist', system-ui, sans-serif;
     }
-    #view-login.active {
-      display: flex;
+    .lg-watermark {
+      position: absolute; right: -4vw; top: 50%; transform: translateY(-50%);
+      font-weight: 700; font-size: 78vh; line-height: .8; letter-spacing: -.03em;
+      color: rgba(20,18,12,.035); pointer-events: none; user-select: none;
     }
-    .login-box {
-      background: var(--card);
-      border-radius: var(--r);
-      padding: 40px 36px;
-      width: 100%;
-      max-width: 360px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      border: 1px solid var(--bordo);
+    .lg-header { display: flex; align-items: center; justify-content: space-between; padding: 26px 48px; position: relative; z-index: 5; }
+    .lg-brand { display: flex; align-items: center; gap: 11px; }
+    .lg-brand-name { font-family: 'Geist Mono', monospace; font-size: 13px; letter-spacing: .2em; text-transform: uppercase; font-weight: 500; }
+    .lg-brand-sub { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #a6a49b; }
+    .lg-main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px 48px 64px; position: relative; z-index: 4; }
+    .lg-form { width: 420px; max-width: 100%; }
+    .lg-eyebrow { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; animation: focusIn .9s .25s both; }
+    .lg-eyebrow .hair { display: inline-block; width: 42px; height: 1px; background: #16150f; transform-origin: left; animation: hairline .8s .3s both; }
+    .lg-eyebrow .lbl { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: #6c6b63; }
+    .lg-title { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 54px; line-height: 1; letter-spacing: -.015em; margin-bottom: 10px; animation: focusIn 1s .36s both; }
+    .lg-sub { font-size: 15px; line-height: 1.55; color: #54534b; margin-bottom: 34px; animation: focusIn 1s .48s both; }
+    .lg-flabel { display: block; font-family: 'Geist Mono', monospace; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #8a897f; margin-bottom: 7px; }
+    .lg-field { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border: 1px solid #d6d4cb; border-radius: 10px; background: #fbfbf9; margin-bottom: 18px; transition: border-color .15s; }
+    .lg-field:focus-within { border-color: #16150f; }
+    .lg-field input { border: none; outline: none; background: transparent; width: 100%; font-family: 'Geist Mono', monospace; font-size: 14px; color: #16150f; }
+    .lg-field.pass input { font-family: 'Geist', sans-serif; }
+    .lg-field .eye { flex-shrink: 0; cursor: pointer; }
+    .lg-field.user { animation: focusIn 1s .58s both; }
+    .lg-field.pass { margin-bottom: 8px; animation: focusIn 1s .66s both; }
+    .lg-flabel.user { animation: focusIn 1s .58s both; }
+    .lg-flabel.pass { animation: focusIn 1s .66s both; }
+    #login-error { min-height: 16px; font-size: 12px; color: #b23a2f; margin-bottom: 14px; opacity: 0; transition: opacity .2s; }
+    .lg-btn {
+      width: 100%; height: 48px; border-radius: 10px; background: #16150f; color: #f4f3f0;
+      font-size: 14px; font-weight: 500; font-family: 'Geist', sans-serif; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 10px; animation: focusIn 1s .74s both;
     }
-    .login-box h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-    .login-box label {
-      font-size: 0.85rem;
-      color: var(--txt2);
-      display: block;
-      margin-bottom: 4px;
-    }
-    .login-box input {
-      width: 100%;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid var(--bordo);
-      background: #fff;
-      font-size: 0.95rem;
-      font-family: inherit;
-      color: var(--txt);
-      outline: none;
-      transition: border-color .15s;
-    }
-    .login-box input:focus { border-color: var(--txt); }
-    #login-error {
-      color: var(--rosso);
-      font-size: 0.85rem;
-      min-height: 1.2em;
+    .lg-btn:hover { background: #000; }
+    .lg-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 18px; border-top: 1px dashed #d6d4cb; animation: focusIn 1s .82s both; }
+    .lg-foot .hint { font-size: 12.5px; color: #6c6b63; }
+    .lg-foot .demo { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .06em; color: #a6a49b; }
+    .lg-creds { font-family: 'Geist Mono', monospace; font-size: 10.5px; line-height: 1.85; color: #8a897f; margin-top: 14px; animation: focusIn 1s .9s both; }
+    .lg-creds b { color: #54534b; font-weight: 600; }
+    .lg-eyelid { position: fixed; left: -5vw; width: 110vw; height: 80vh; z-index: 60; pointer-events: none; transition: transform .7s cubic-bezier(.66,0,.34,1); }
+    .lg-eyelid.top { top: 0; background: linear-gradient(180deg,#eceae4,#f6f5f1 72%); border-bottom: 1.5px solid rgba(20,18,12,.26); border-radius: 0 0 50% 50% / 0 0 220px 220px; box-shadow: 0 16px 38px -12px rgba(20,18,12,.22); }
+    .lg-eyelid.bot { bottom: 0; background: linear-gradient(0deg,#eceae4,#f6f5f1 72%); border-top: 1.5px solid rgba(20,18,12,.26); border-radius: 50% 50% 0 0 / 220px 220px 0 0; box-shadow: 0 -16px 38px -12px rgba(20,18,12,.22); }
+    .lg-eyelid.top.closed { transform: translateY(0); }
+    .lg-eyelid.top.open  { transform: translateY(-101%); }
+    .lg-eyelid.bot.closed { transform: translateY(0); }
+    .lg-eyelid.bot.open  { transform: translateY(101%); }
+    @keyframes focusIn { from { filter: blur(13px); opacity: 0; transform: translateY(13px); } 55% { opacity: 1; } to { filter: blur(0); opacity: 1; transform: none; } }
+    @keyframes hairline { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @media (max-width: 560px) {
+      .lg-header { padding: 18px 22px; }
+      .lg-main { padding: 16px 22px 48px; }
+      .lg-title { font-size: 42px; }
+      .lg-watermark { font-size: 56vh; right: -12vw; }
     }
 
     /* ── Card ── */
@@ -621,31 +633,53 @@
 
 <!-- Login view (full-screen overlay, outside #app) -->
 <div id="view-login">
-  <div class="login-box">
-    <div>
-      <div style="font-size:2rem; margin-bottom:8px;">👁</div>
-      <h1>Gestionale Oculistico</h1>
-    </div>
-    <form id="login-form" onsubmit="handleLoginSubmit(event)">
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        <div>
-          <label for="login-user">Utente</label>
-          <input id="login-user" type="text" autocomplete="username" placeholder="rossi / paziente" required>
+  <div class="lg-root">
+    <!-- "E" optotype watermark -->
+    <div class="lg-watermark">E</div>
+
+    <header class="lg-header">
+      <div class="lg-brand">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="lg-brand-name">Studio Medico</span>
+        <span class="lg-brand-sub">· Oculistica</span>
+      </div>
+    </header>
+
+    <main class="lg-main">
+      <form class="lg-form" id="login-form" onsubmit="handleLoginSubmit(event)">
+        <div class="lg-eyebrow"><span class="hair"></span><span class="lbl">Area riservata</span></div>
+        <h1 class="lg-title">Bentornato.</h1>
+        <p class="lg-sub">Accedi per gestire visite, pazienti e referti.</p>
+
+        <label class="lg-flabel user" for="login-user">Utente</label>
+        <div class="lg-field user">
+          <input id="login-user" type="text" autocomplete="username" spellcheck="false" placeholder="rossi" required>
         </div>
-        <div>
-          <label for="login-pass">Password</label>
+
+        <label class="lg-flabel pass" for="login-pass">Password</label>
+        <div class="lg-field pass">
           <input id="login-pass" type="password" autocomplete="current-password" placeholder="demo" required>
+          <svg class="eye" onclick="toggleLoginPass()" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a6a49b" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
         </div>
         <div id="login-error"></div>
-        <button type="submit" class="btn btn-primary" style="width:100%;">Accedi</button>
-      </div>
-    </form>
-    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--bordo);font-size:0.78rem;color:var(--txt2);text-align:left;line-height:1.7;">
-      <div style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:0.7rem;margin-bottom:6px;">Credenziali demo · password <code>demo</code></div>
-      <div>👨‍⚕️ <strong>Medico:</strong> <code>rossi</code> o <code>bianchi</code> — gestione pazienti, refertazione</div>
-      <div>📝 <strong>Accettazione per medico:</strong> <code>reg-rossi</code> / <code>reg-bianchi</code> — registrazione anagrafica, paziente assegnato al medico (anche via QR del medico)</div>
-      <div>✍️ <strong>Postazione firma:</strong> <code>firma-rossi</code> / <code>firma-bianchi</code> — iPad in stanza, mostra il consenso del paziente corrente del medico</div>
-    </div>
+
+        <button type="submit" class="lg-btn">Accedi <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+
+        <div class="lg-foot">
+          <span class="hint">Studio oculistico · area medici</span>
+          <span class="demo">DEMO · password demo</span>
+        </div>
+        <div class="lg-creds">
+          <div><b>Medico:</b> rossi · bianchi</div>
+          <div><b>Accettazione:</b> reg-rossi · reg-bianchi</div>
+          <div><b>Firma iPad:</b> firma-rossi · firma-bianchi</div>
+        </div>
+      </form>
+    </main>
+
+    <!-- palpebre: partono chiuse, si aprono al caricamento -->
+    <div class="lg-eyelid top closed" id="eyelidTop"></div>
+    <div class="lg-eyelid bot closed" id="eyelidBot"></div>
   </div>
 </div>
 
@@ -1226,7 +1260,10 @@ function render() {
     // Pulisce sidebar
     renderSidebar();
     // Svuota errore al ritorno
-    document.getElementById('login-error').textContent = '';
+    const le = document.getElementById('login-error');
+    if (le) { le.textContent = ''; le.style.opacity = '0'; }
+    // Animazione: palpebre che si aprono come un occhio
+    apriPalpebre();
     return;
   }
 
@@ -1269,15 +1306,49 @@ function renderSidebarKiosk() {
     </div>`;
 }
 
+// ── Animazione palpebre (login) ───────────────────────────────────────────────
+function apriPalpebre() {
+  const t = document.getElementById('eyelidTop');
+  const b = document.getElementById('eyelidBot');
+  if (!t || !b) return;
+  // reset a chiuse
+  t.classList.remove('open'); t.classList.add('closed');
+  b.classList.remove('open'); b.classList.add('closed');
+  void t.offsetWidth; // forza reflow
+  setTimeout(() => {
+    t.classList.remove('closed'); t.classList.add('open');
+    b.classList.remove('closed'); b.classList.add('open');
+  }, 180);
+}
+
+function chiudiPalpebre() {
+  const t = document.getElementById('eyelidTop');
+  const b = document.getElementById('eyelidBot');
+  if (!t || !b) return;
+  t.classList.remove('open'); t.classList.add('closed');
+  b.classList.remove('open'); b.classList.add('closed');
+}
+
+function toggleLoginPass() {
+  const inp = document.getElementById('login-pass');
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
 // ── Login form handler ────────────────────────────────────────────────────────
 function handleLoginSubmit(e) {
   e.preventDefault();
-  const user = document.getElementById('login-user').value.trim();
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
-  const ok = login(user, pass);
-  if (!ok) {
-    document.getElementById('login-error').textContent = 'Credenziali non valide. Riprova.';
+  const err  = document.getElementById('login-error');
+  const u = UTENTI[user];
+  if (!u || u.pass !== pass) {
+    if (err) { err.textContent = 'Credenziali non valide. Riprova.'; err.style.opacity = '1'; }
+    return;
   }
+  if (err) err.style.opacity = '0';
+  // blink: le palpebre si chiudono, poi si entra nell'app
+  chiudiPalpebre();
+  setTimeout(() => { login(user, pass); }, 640);
 }
 
 // ── Form CSS (anagrafica) ─────────────────────────────────────────────────────
