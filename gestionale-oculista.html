@@ -143,6 +143,27 @@
       padding: 20px;
     }
 
+    /* ── Modale (popup consenso) ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(20,18,12,.45);
+      z-index: 500; display: flex; align-items: center; justify-content: center;
+      padding: 20px; animation: modalFade .18s ease;
+    }
+    @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
+    .modal-box {
+      background: #fff; border-radius: 16px; max-width: 640px; width: 100%;
+      max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 30px 80px -20px rgba(0,0,0,.4); overflow: hidden;
+      animation: modalPop .2s cubic-bezier(.2,.7,.3,1);
+    }
+    @keyframes modalPop { from { transform: translateY(12px) scale(.98); opacity: .6; } to { transform: none; opacity: 1; } }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid var(--bordo); }
+    .modal-head h3 { font-size: 1rem; font-weight: 700; color: var(--txt); line-height: 1.3; }
+    .modal-x { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--bordo); background: none; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--txt2); flex-shrink: 0; }
+    .modal-x:hover { background: var(--card); }
+    .modal-body { padding: 18px 22px; overflow-y: auto; font-size: 0.9rem; color: var(--txt2); line-height: 1.6; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--bordo); flex-wrap: wrap; }
+
     /* ── Badge ── */
     .badge {
       display: inline-block;
@@ -1598,9 +1619,55 @@ function handleLoginSubmit(e) {
   document.head.appendChild(s);
 })();
 
+// ── Informativa GDPR (testo riutilizzabile) ───────────────────────────────────
+function informativaGDPRHtml() {
+  return `
+    <p style="margin-bottom:10px;"><strong style="color:var(--txt);">TITOLARE DEL TRATTAMENTO</strong><br>
+    [Nome Studio / Struttura Oculistica] — [Indirizzo] — [Email/PEC] <em>(da completare)</em>.</p>
+    <p style="margin-bottom:10px;"><strong style="color:var(--txt);">FINALITÀ E BASE GIURIDICA</strong><br>
+    I Suoi dati personali e sanitari sono trattati per finalità di diagnosi, cura e gestione amministrativa della visita oculistica, ai sensi dell'art. 9(2)(h) GDPR e del D.Lgs. 196/2003 come modificato dal D.Lgs. 101/2018.</p>
+    <p style="margin-bottom:10px;"><strong style="color:var(--txt);">CATEGORIE DI DATI</strong><br>
+    Dati anagrafici, dati di contatto, dati sanitari (referto oculistico, misurazioni visive, diagnosi, prescrizioni).</p>
+    <p style="margin-bottom:10px;"><strong style="color:var(--txt);">CONSERVAZIONE</strong><br>
+    I dati saranno conservati per il periodo minimo previsto dalla normativa sanitaria vigente (minimo 10 anni dalla data della visita).</p>
+    <p style="margin-bottom:10px;"><strong style="color:var(--txt);">DIRITTI DELL'INTERESSATO</strong><br>
+    Lei ha il diritto di accedere, rettificare, cancellare, limitare od opporsi al trattamento dei propri dati, nonché di proporre reclamo al Garante per la Protezione dei Dati Personali (www.garanteprivacy.it).</p>
+    <p><em>Questo testo è un placeholder standard; il titolare deve integrarlo con i propri dati prima dell'uso in produzione.</em></p>`;
+}
+
+// ── Modale consenso (popup: non fa uscire dal form) ───────────────────────────
+function apriModaleConsenso(onAccetta) {
+  chiudiModaleConsenso();
+  const ov = document.createElement('div');
+  ov.id = 'consenso-modal';
+  ov.className = 'modal-overlay';
+  ov.innerHTML = `
+    <div class="modal-box" role="dialog" aria-modal="true" aria-label="Informativa privacy">
+      <div class="modal-head">
+        <h3>Informativa Privacy e Consenso al Trattamento dei Dati (GDPR)</h3>
+        <button type="button" class="modal-x" aria-label="Chiudi" onclick="chiudiModaleConsenso()">×</button>
+      </div>
+      <div class="modal-body">${informativaGDPRHtml()}</div>
+      <div class="modal-foot">
+        <button type="button" class="btn" onclick="chiudiModaleConsenso()">Chiudi</button>
+        <button type="button" class="btn btn-primary" id="modal-accetta">Ho letto e accetto</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  ov.addEventListener('click', (e) => { if (e.target === ov) chiudiModaleConsenso(); });
+  const acc = ov.querySelector('#modal-accetta');
+  if (acc) acc.addEventListener('click', () => { if (typeof onAccetta === 'function') onAccetta(); chiudiModaleConsenso(); });
+}
+function chiudiModaleConsenso() {
+  const ov = document.getElementById('consenso-modal');
+  if (ov) ov.remove();
+  document.body.style.overflow = '';
+}
+
 // ── renderAnagrafica ──────────────────────────────────────────────────────────
-// Signature: renderAnagrafica(container, {paziente, editable, onSubmit, submitLabel})
-function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit, submitLabel = 'Invia' }) {
+// Signature: renderAnagrafica(container, {paziente, editable, onSubmit, submitLabel, consenso})
+function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit, submitLabel = 'Invia', consenso = false }) {
   const p = paziente;
   const a = p.anagrafica || {};
   const m = p.motivo   || {};
@@ -1742,8 +1809,25 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
     </div>
   </div>
 
+  ${consenso ? `
+  <div class="form-section" style="background:var(--card); border-radius:var(--r); padding:16px;">
+    <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:0.9rem; color:var(--txt); line-height:1.5;">
+      <input type="checkbox" id="consenso-check" style="margin-top:2px; width:18px; height:18px; flex-shrink:0; cursor:pointer;">
+      <span>Ho letto e accetto l'<button type="button" id="apri-consenso" style="background:none; border:none; padding:0; color:var(--blu); text-decoration:underline; cursor:pointer; font-size:0.9rem; font-family:inherit;">informativa sul trattamento dei dati personali e sanitari (GDPR)</button>.</span>
+    </label>
+  </div>` : ''}
+
   ${editable ? `<button type="submit" class="btn btn-primary" style="width:100%; margin-top:4px;">${submitLabel}</button>` : ''}
 </form>`;
+
+  // Link "informativa" → apre il modale (senza uscire dal form)
+  const apriBtn = container.querySelector('#apri-consenso');
+  if (apriBtn) {
+    apriBtn.addEventListener('click', () => apriModaleConsenso(() => {
+      const chk = container.querySelector('#consenso-check');
+      if (chk) chk.checked = true;
+    }));
+  }
 
   // Submit handler
   if (editable && onSubmit) {
@@ -1771,6 +1855,15 @@ function renderAnagrafica(container, { paziente = {}, editable = true, onSubmit,
           errEl.textContent = cfCheck.msg;
           return;
         }
+      }
+      // Consenso obbligatorio (registrazione paziente)
+      if (consenso) {
+        const chk = container.querySelector('#consenso-check');
+        if (!chk || !chk.checked) {
+          errEl.textContent = 'Per inviare la registrazione devi accettare il consenso al trattamento dei dati.';
+          return;
+        }
+        dati.consensoTrattamento = { accettato: true, ts: new Date().toISOString() };
       }
       errEl.textContent = '';
       onSubmit(dati);
@@ -2646,6 +2739,7 @@ registerRenderer('registrazione', function() {
     paziente: nuovoPaziente(),
     editable: true,
     submitLabel: 'Invia registrazione',
+    consenso: true,
     onSubmit: function(dati) {
       const p = { ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO };
       if (medicoPreassegnato) p.medicoAssegnato = medicoPreassegnato;
