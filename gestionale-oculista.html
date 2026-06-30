@@ -418,6 +418,9 @@
     .bd2-rail.warn { background: #e0b94e; }
     .bd2-rail.urg { background: var(--rosso); }
     .bd2-nome { font-size: 0.9rem; font-weight: 600; flex: 1; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bd2-cons { width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; flex-shrink: 0; line-height: 1; }
+    .bd2-cons.ok { background: #e6f7ed; color: #1e7e45; }
+    .bd2-cons.no { background: var(--ambra); color: var(--ambra-txt); }
     .bd2-time { font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--txt2); white-space: nowrap; }
     .bd2-time.warn { color: var(--ambra-txt); font-weight: 600; }
     .bd2-time.urg { color: var(--rosso); font-weight: 600; }
@@ -2066,22 +2069,40 @@ function renderDettaglio(container, id) {
   {
     const evF = (p.eventi || []).slice().reverse().find(e => e.stato === STATI.CONSENSO);
     const dataFirma = evF ? new Date(evF.ts).toLocaleDateString('it-IT') : '';
-    const head = (badge) => `<div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);display:flex;justify-content:space-between;align-items:center;gap:8px;"><span>Consenso trattamento dati</span>${badge}</div>`;
-    if (p.firmaConsenso) {
-      const badge = `<span style="background:#e6f7ed;color:#1e7e45;padding:3px 10px;border-radius:999px;font-size:0.72rem;letter-spacing:0;text-transform:none;white-space:nowrap;">✓ Firmato${dataFirma ? ' · ' + dataFirma : ''}</span>`;
-      cardConsenso = `
+
+    // Riga 1: accettazione del consenso al trattamento in fase di registrazione (flag)
+    const ct = p.consensoTrattamento;
+    const dataFlag = ct && ct.ts ? new Date(ct.ts).toLocaleString('it-IT', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const rigaFlag = ct && ct.accettato
+      ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--bordo);">
+           <span style="font-size:0.85rem;color:var(--txt);">Accettazione in registrazione</span>
+           <span style="background:#e6f7ed;color:#1e7e45;padding:3px 10px;border-radius:999px;font-size:0.72rem;white-space:nowrap;">✓ Accettato${dataFlag ? ' · ' + dataFlag : ''}</span>
+         </div>`
+      : `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--bordo);">
+           <span style="font-size:0.85rem;color:var(--txt);">Accettazione in registrazione</span>
+           <span style="background:var(--ambra);color:var(--ambra-txt);padding:3px 10px;border-radius:999px;font-size:0.72rem;white-space:nowrap;">⚠ Non risulta accettato</span>
+         </div>`;
+
+    // Riga 2: firma del modulo (canvas iPad)
+    const rigaFirma = p.firmaConsenso
+      ? `<div style="padding-top:12px;">
+           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+             <span style="font-size:0.85rem;color:var(--txt);">Firma del modulo</span>
+             <span style="background:#e6f7ed;color:#1e7e45;padding:3px 10px;border-radius:999px;font-size:0.72rem;white-space:nowrap;">✓ Firmato${dataFirma ? ' · ' + dataFirma : ''}</span>
+           </div>
+           <img src="${p.firmaConsenso}" alt="Firma consenso" style="max-width:240px;border:1px solid var(--bordo);border-radius:8px;background:#fff;display:block;">
+         </div>`
+      : `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:12px;">
+           <span style="font-size:0.85rem;color:var(--txt);">Firma del modulo</span>
+           <span style="background:var(--ambra);color:var(--ambra-txt);padding:3px 10px;border-radius:999px;font-size:0.72rem;white-space:nowrap;">⚠ Da firmare</span>
+         </div>`;
+
+    cardConsenso = `
       <div class="card" style="margin-bottom:16px;">
-        ${head(badge)}
-        <img src="${p.firmaConsenso}" alt="Firma consenso" style="max-width:240px;border:1px solid var(--bordo);border-radius:8px;background:#fff;display:block;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Consenso trattamento dati</div>
+        ${rigaFlag}
+        ${rigaFirma}
       </div>`;
-    } else {
-      const badge = `<span style="background:var(--ambra);color:var(--ambra-txt);padding:3px 10px;border-radius:999px;font-size:0.72rem;letter-spacing:0;text-transform:none;white-space:nowrap;">⚠ Da firmare</span>`;
-      cardConsenso = `
-      <div class="card" style="margin-bottom:16px;">
-        ${head(badge)}
-        <div style="font-size:0.85rem;color:var(--txt2);">Il paziente non ha ancora firmato il consenso al trattamento dei dati personali e sanitari.</div>
-      </div>`;
-    }
   }
 
   container.innerHTML = `
@@ -2290,6 +2311,10 @@ function renderBoard(container, filtroSoloAttesa) {
   function rigaPaziente(p, tipo) {
     const nome = escapeHtml(nomeCompleto(p) || '(senza nome)');
     const since = inizioStatoCorrente(p);
+    const consOk = p.consensoTrattamento && p.consensoTrattamento.accettato;
+    const consIcon = consOk
+      ? `<span class="bd2-cons ok" title="Consenso GDPR accettato in registrazione">✓</span>`
+      : `<span class="bd2-cons no" title="Consenso GDPR non risulta accettato">!</span>`;
     let destra = '', quick = '';
 
     if (tipo === 'attesa') {
@@ -2317,6 +2342,7 @@ function renderBoard(container, filtroSoloAttesa) {
       <div class="bd2-row" onclick="apriDettaglio('${p.id}')" title="${nome}">
         <span class="bd2-rail"></span>
         <span class="bd2-nome">${nome}</span>
+        ${consIcon}
         ${destra}${quick}
       </div>`;
   }
@@ -3581,7 +3607,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v4'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v5'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -3715,6 +3741,8 @@ function seedDemoData() {
     p.stato = stato;
     // Consenso firmato per gli stati che lo prevedono (consenso firmato / completato)
     if (stato === STATI.CONSENSO || stato === STATI.COMPLETATO) p.firmaConsenso = firmaFinta();
+    // Consenso al trattamento accettato in registrazione (demo: ~85% sì, alcuni no)
+    if (rand() > 0.15) p.consensoTrattamento = { accettato: true, ts: ago(minutiFa + 4) };
     db._save([...db.getPazienti(), p]);
   }
 
