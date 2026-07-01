@@ -2790,12 +2790,34 @@ registerRenderer('in-attesa', function() {
 });
 
 // ── Renderer: vista registrazione paziente (redesign "Studio Medico" 1b) ──────
-registerRenderer('registrazione', function() {
-  const container = document.getElementById('view-registrazione');
-  const _sessReg = sessionCorrente();
-  const medicoPreassegnato = (_sessReg && _sessReg.ruolo === 'registrazione' ? _sessReg.medico : null) || _kioscoMedico;
+const REG2_EYE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
-  const eyeSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+// Schermata di completamento condivisa (stile "Studio Medico")
+function reg2Successo(container, { titolo, testoHtml, azioni }) {
+  container.innerHTML = `
+    <div class="reg2-wrap">
+      <div class="reg2-doc">
+        <div class="reg2-header">${REG2_EYE}<span class="brand">Studio Medico</span><span class="brand-sub">· Oculistica</span></div>
+        <div class="reg2-ok">
+          <div class="tick">✓</div>
+          <div class="t">${titolo}</div>
+          <div class="d">${testoHtml}</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+            ${azioni.map((a, i) => `<button data-i="${i}">${a.label}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  container.querySelectorAll('.reg2-ok button').forEach((b) => {
+    b.addEventListener('click', () => azioni[Number(b.dataset.i)].onClick());
+  });
+}
+
+// Form registrazione condiviso (paziente da QR/kiosk e "Nuovo paziente" del medico)
+// cfg: { medico, onSalvato(salvato, nome) }
+function renderRegistrazione2(container, cfg) {
+  const medico = cfg.medico || null;
+  const eyeSvg = REG2_EYE;
 
   const campiDati = [
     ['anagrafica.cognome', 'Cognome *', 'Es. Verdi'],
@@ -2955,31 +2977,32 @@ registerRenderer('registrazione', function() {
       dati.consensoTrattamento = { accettato: true, ts: new Date().toISOString() };
 
       const p = { ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO };
-      if (medicoPreassegnato) p.medicoAssegnato = medicoPreassegnato;
+      if (medico) p.medicoAssegnato = medico;
       const salvato = db.savePaziente(p);
       pushEvento(salvato.id, STATI.REGISTRATO);
-      mostraConferma(nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
+      cfg.onSalvato(salvato, nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
     });
   }
 
-  function mostraConferma(nome) {
-    const nomeMed = medicoPreassegnato && UTENTI[medicoPreassegnato] ? UTENTI[medicoPreassegnato].nome : null;
-    container.innerHTML = `
-    <div class="reg2-wrap">
-      <div class="reg2-doc">
-        <div class="reg2-header">${eyeSvg}<span class="brand">Studio Medico</span><span class="brand-sub">· Oculistica</span></div>
-        <div class="reg2-ok">
-          <div class="tick">✓</div>
-          <div class="t">Registrazione completata</div>
-          <div class="d">Grazie, <strong>${escapeHtml(nome)}</strong>. Attenda in sala d'attesa: ${nomeMed ? 'verrà chiamata a breve dallo <strong>' + nomeMed + '</strong>.' : 'verrà chiamata a breve dal medico.'}</div>
-          <button id="btn-nuova-reg">Nuova registrazione</button>
-        </div>
-      </div>
-    </div>`;
-    container.querySelector('#btn-nuova-reg').addEventListener('click', () => showView('registrazione'));
-  }
-
   mostraForm();
+}
+
+// Renderer: registrazione paziente (postazione accettazione / QR medico)
+registerRenderer('registrazione', function() {
+  const container = document.getElementById('view-registrazione');
+  const _s = sessionCorrente();
+  const medico = (_s && _s.ruolo === 'registrazione' ? _s.medico : null) || _kioscoMedico;
+  renderRegistrazione2(container, {
+    medico,
+    onSalvato: (salvato, nome) => {
+      const nomeMed = medico && UTENTI[medico] ? UTENTI[medico].nome : null;
+      reg2Successo(container, {
+        titolo: 'Registrazione completata',
+        testoHtml: `Grazie, <strong>${escapeHtml(nome)}</strong>. Attenda in sala d'attesa: ${nomeMed ? 'verrà chiamata a breve dallo <strong>' + nomeMed + '</strong>.' : 'verrà chiamata a breve dal medico.'}`,
+        azioni: [{ label: 'Nuova registrazione', onClick: () => showView('registrazione') }]
+      });
+    }
+  });
 });
 
 // ── initFirmaCanvas ───────────────────────────────────────────────────────────
@@ -3704,53 +3727,22 @@ registerRenderer('ricerca', function() {
 });
 
 // ── Renderer: nuovo paziente (dal lato medico) ────────────────────────────────
+// Renderer: "Nuovo paziente" del medico — stesso identico form della registrazione
+// (il medico registra al posto del paziente che non è in grado di farlo da solo)
 registerRenderer('nuovo', function() {
   const container = document.getElementById('view-nuovo');
   const sess = sessionCorrente();
-
-  function mostraConferma(nome, id) {
-    container.innerHTML = `
-      <div class="conferma-box">
-        <div class="icon">✅</div>
-        <h2>Paziente aggiunto</h2>
-        <p><strong>${nome}</strong> è stato aggiunto alla lista e messo in coda.</p>
-        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-          <button class="btn btn-primary" id="btn-apri-dettaglio">Apri dettaglio</button>
-          <button class="btn" id="btn-altro-paziente">Aggiungi un altro paziente</button>
-        </div>
-      </div>`;
-    container.querySelector('#btn-apri-dettaglio').addEventListener('click', () => apriDettaglio(id));
-    container.querySelector('#btn-altro-paziente').addEventListener('click', () => showView('nuovo'));
-  }
-
-  const wrapper = document.createElement('div');
-  wrapper.style.maxWidth = '720px';
-  const backBtn = document.createElement('button');
-  backBtn.className = 'btn';
-  backBtn.style.marginBottom = '16px';
-  backBtn.textContent = '← Torna alla board';
-  backBtn.onclick = () => showView('board');
-  wrapper.appendChild(backBtn);
-
-  const formEl = document.createElement('div');
-  wrapper.appendChild(formEl);
-  container.innerHTML = '';
-  container.appendChild(wrapper);
-
-  renderAnagrafica(formEl, {
-    paziente: nuovoPaziente(),
-    editable: true,
-    submitLabel: 'Aggiungi e metti in attesa',
-    onSubmit: function(dati) {
-      const salvato = db.savePaziente({
-        ...nuovoPaziente(),
-        ...dati,
-        stato: STATI.IN_ATTESA,
-        medicoAssegnato: sess ? sess.user : null
+  renderRegistrazione2(container, {
+    medico: sess ? sess.user : null,
+    onSalvato: (salvato, nome) => {
+      reg2Successo(container, {
+        titolo: 'Paziente registrato',
+        testoHtml: `<strong>${escapeHtml(nome)}</strong> è stato registrato e messo in attesa nella tua board.`,
+        azioni: [
+          { label: 'Apri scheda', onClick: () => apriDettaglio(salvato.id) },
+          { label: 'Nuovo paziente', onClick: () => showView('nuovo') }
+        ]
       });
-      pushEvento(salvato.id, STATI.REGISTRATO);
-      const nomePaz = nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome || '(senza nome)';
-      mostraConferma(nomePaz, salvato.id);
     }
   });
 });
