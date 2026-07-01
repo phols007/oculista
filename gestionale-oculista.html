@@ -151,18 +151,68 @@
     }
     @keyframes modalFade { from { opacity: 0; } to { opacity: 1; } }
     .modal-box {
-      background: #fff; border-radius: 16px; max-width: 640px; width: 100%;
+      background: #fbfbf9; border-radius: 18px; max-width: 600px; width: 100%;
       max-height: 85vh; display: flex; flex-direction: column;
-      box-shadow: 0 30px 80px -20px rgba(0,0,0,.4); overflow: hidden;
+      box-shadow: 0 40px 90px -20px rgba(0,0,0,.4); overflow: hidden;
       animation: modalPop .2s cubic-bezier(.2,.7,.3,1);
     }
     @keyframes modalPop { from { transform: translateY(12px) scale(.98); opacity: .6; } to { transform: none; opacity: 1; } }
-    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px 14px; border-bottom: 1px solid var(--bordo); }
-    .modal-head h3 { font-size: 1rem; font-weight: 700; color: var(--txt); line-height: 1.3; }
-    .modal-x { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--bordo); background: none; cursor: pointer; font-size: 1.2rem; line-height: 1; color: var(--txt2); flex-shrink: 0; }
-    .modal-x:hover { background: var(--card); }
-    .modal-body { padding: 18px 22px; overflow-y: auto; font-size: 0.9rem; color: var(--txt2); line-height: 1.6; }
-    .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--bordo); flex-wrap: wrap; }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 22px 26px; border-bottom: 1px solid #e2e0d8; }
+    .modal-head h3 { font-family: 'Instrument Serif', serif; font-size: 20px; font-weight: 400; color: #16150f; line-height: 1.25; }
+    .modal-x { background: none; border: none; font-size: 22px; line-height: 1; color: #8a897f; cursor: pointer; flex-shrink: 0; }
+    .modal-body { padding: 22px 26px; overflow-y: auto; font-size: 13.5px; color: #54534b; line-height: 1.6; }
+    .modal-body strong { color: #16150f; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 26px; border-top: 1px solid #e2e0d8; flex-wrap: wrap; }
+    .modal-foot .btn { border-radius: 999px; }
+    .modal-foot .btn.btn-primary { background: #16150f; border-color: #16150f; color: #f4f3f0; }
+
+    /* ── Registrazione redesign (variante 1b — cards numerate) ── */
+    .reg2-wrap { max-width: 860px; margin: 0 auto; }
+    .reg2-doc { background: #efeee7; border-radius: 24px; overflow: hidden; font-family: 'Geist', system-ui, sans-serif; color: #16150f; }
+    .reg2-header { display: flex; align-items: center; gap: 10px; padding: 26px 40px 22px; border-bottom: 1px solid #e2e0d8; }
+    .reg2-header .brand { font-family: 'Geist Mono', monospace; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; }
+    .reg2-header .brand-sub { font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: #a6a49b; }
+    .reg2-form { padding: 26px 40px 44px; }
+    .reg2-badge { display: inline-block; font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: #54534b; background: #fff; border: 1px solid #e2e0d8; border-radius: 999px; padding: 5px 13px; margin-bottom: 14px; }
+    .reg2-title { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 32px; letter-spacing: -.01em; margin-bottom: 8px; }
+    .reg2-sub { font-size: 13.5px; line-height: 1.55; color: #54534b; max-width: 44ch; margin-bottom: 24px; }
+    .reg2-error { color: #b23a2f; font-size: 12.5px; margin-bottom: 14px; min-height: 0; }
+    .reg2-card { background: #fff; border: 1px solid #e2e0d8; border-radius: 16px; padding: 22px; margin-bottom: 18px; }
+    .reg2-cardhead { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .reg2-num { width: 24px; height: 24px; border-radius: 50%; background: #16150f; color: #f4f3f0; font-family: 'Geist Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .reg2-cardtitle { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #54534b; }
+    .reg2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+    .reg2-field { display: flex; flex-direction: column; gap: 6px; }
+    .reg2-field.full { grid-column: 1 / -1; }
+    .reg2-field label { font-size: 12px; color: #8a897f; }
+    .reg2-input { height: 42px; padding: 0 12px; border: 1px solid #e2e0d8; border-radius: 10px; background: #fbfbf9; font-family: 'Geist', sans-serif; font-size: 13.5px; color: #16150f; outline: none; transition: border-color .15s; }
+    .reg2-input:focus { border-color: #16150f; }
+    .reg2-sesso { display: flex; align-items: center; gap: 18px; margin-top: 14px; }
+    .reg2-sesso > span { font-size: 12px; color: #8a897f; }
+    .reg2-radio, .reg2-check { display: flex; align-items: center; gap: 7px; font-size: 13.5px; cursor: pointer; }
+    .reg2-motivi { display: flex; flex-direction: column; gap: 13px; }
+    .reg2-subinput { margin-top: 8px; margin-left: 28px; height: 38px; padding: 0 12px; border: 1px solid #e2e0d8; border-radius: 9px; background: #fbfbf9; font-family: 'Geist', sans-serif; font-size: 13px; width: calc(100% - 28px); outline: none; }
+    .reg2-anamnesi { display: flex; flex-direction: column; gap: 16px; }
+    .reg2-qrow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .reg2-qrow > span { font-size: 13.5px; color: #54534b; }
+    .reg2-consent { background: #fbf3df; border: 1px solid #e7d9ad; border-radius: 16px; padding: 22px; margin-bottom: 22px; }
+    .reg2-consent label { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+    .reg2-consent input { margin-top: 3px; width: 19px; height: 19px; flex-shrink: 0; cursor: pointer; }
+    .reg2-consent span { font-size: 13.5px; line-height: 1.55; color: #5c4a1f; }
+    .reg2-consent a { color: #92651a; text-decoration: underline; cursor: pointer; font-weight: 600; }
+    .reg2-submit { width: 100%; height: 50px; border-radius: 14px; background: #16150f; color: #f4f3f0; font-size: 14px; font-weight: 500; font-family: 'Geist', sans-serif; border: none; cursor: pointer; }
+    .reg2-submit:hover { background: #000; }
+    .reg2-ok { text-align: center; padding: 120px 40px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .reg2-ok .tick { width: 54px; height: 54px; border-radius: 50%; background: #16150f; color: #f4f3f0; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .reg2-ok .t { font-family: 'Instrument Serif', serif; font-size: 32px; color: #16150f; }
+    .reg2-ok .d { font-size: 14px; color: #54534b; max-width: 36ch; line-height: 1.55; }
+    .reg2-ok button { margin-top: 8px; font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; background: none; border: 1px solid #cfcdc4; border-radius: 12px; padding: 12px 22px; cursor: pointer; }
+    @media (max-width: 720px) {
+      .reg2-header { padding: 20px 22px 18px; }
+      .reg2-form { padding: 22px 22px 36px; }
+      .reg2-grid { grid-template-columns: 1fr; }
+      .reg2-card { padding: 18px; }
+    }
 
     /* ── Badge ── */
     .badge {
@@ -2739,41 +2789,197 @@ registerRenderer('in-attesa', function() {
   renderBoard(document.getElementById('view-in-attesa'), true);
 });
 
-// ── Renderer: vista registrazione paziente ────────────────────────────────────
+// ── Renderer: vista registrazione paziente (redesign "Studio Medico" 1b) ──────
 registerRenderer('registrazione', function() {
   const container = document.getElementById('view-registrazione');
   const _sessReg = sessionCorrente();
   const medicoPreassegnato = (_sessReg && _sessReg.ruolo === 'registrazione' ? _sessReg.medico : null) || _kioscoMedico;
 
-  function mostraConferma(nome) {
-    const nomeMed = medicoPreassegnato && UTENTI[medicoPreassegnato] ? UTENTI[medicoPreassegnato].nome : null;
-    container.innerHTML = `
-      <div class="conferma-box">
-        <div class="icon">✅</div>
-        <h2>Registrazione inviata</h2>
-        <p>Grazie, <strong>${nome}</strong>. La tua registrazione è stata ricevuta.<br>
-           ${nomeMed ? `Verrai chiamato dallo <strong>${nomeMed}</strong>.` : 'Attendi di essere chiamato dal medico.'}
-        </p>
-        <button class="btn btn-primary" id="btn-nuova-reg">Nuova registrazione</button>
-      </div>`;
-    container.querySelector('#btn-nuova-reg').addEventListener('click', function() {
-      showView('registrazione');
-    });
-  }
+  const eyeSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
 
-  renderAnagrafica(container, {
-    paziente: nuovoPaziente(),
-    editable: true,
-    submitLabel: 'Invia registrazione',
-    consenso: true,
-    onSubmit: function(dati) {
+  const campiDati = [
+    ['anagrafica.cognome', 'Cognome *', 'Es. Verdi'],
+    ['anagrafica.nome', 'Nome *', 'Es. Anna'],
+    ['anagrafica.dataNascita', 'Data di nascita * (GG/MM/AAAA)', 'GG/MM/AAAA'],
+    ['anagrafica.codiceFiscale', 'Codice Fiscale', 'RSSMRA80A01H501Z'],
+    ['anagrafica.comuneNascita', 'Comune di nascita', 'Es. Roma'],
+    ['anagrafica.indirizzo', 'Indirizzo', 'Via Roma 1'],
+    ['anagrafica.citta', 'Città', 'Es. Cagliari'],
+    ['anagrafica.telefono', 'Telefono', '+39 320 000 0000'],
+    ['anagrafica.email', 'Email', 'nome@email.it']
+  ];
+  const campiAnamnesi = [
+    ['anamnesi.qualiProblemi', 'Se sì, quali problemi?', 'Descrivi...'],
+    ['anamnesi.daQuanto', 'Da quanto tempo porta occhiali/lac?', 'Es. 2 anni'],
+    ['anamnesi.malattie', 'Malattie sistemiche', 'Es. ipertensione, diabete...'],
+    ['anamnesi.farmaci', 'Farmaci assunti', 'Es. betabloccanti...'],
+    ['anamnesi.interventi', 'Interventi oculari pregressi', 'Es. cataratta, refrattiva...']
+  ];
+  const field = ([f, label, ph], full) => `
+    <div class="reg2-field${full ? ' full' : ''}">
+      <label>${label}</label>
+      <input class="reg2-input" type="text" data-field="${f}" placeholder="${ph}">
+    </div>`;
+
+  function mostraForm() {
+    container.innerHTML = `
+    <div class="reg2-wrap">
+      <div class="reg2-doc">
+        <div class="reg2-header">${eyeSvg}<span class="brand">Studio Medico</span><span class="brand-sub">· Oculistica</span></div>
+        <form id="reg2-form" class="reg2-form" autocomplete="off">
+          <span class="reg2-badge">Registrazione</span>
+          <h1 class="reg2-title">Nuova registrazione</h1>
+          <p class="reg2-sub">Compili le sezioni qui sotto: i Suoi dati restano su questa schermata.</p>
+          <div class="reg2-error" id="reg2-error"></div>
+
+          <!-- 01 Dati paziente -->
+          <div class="reg2-card">
+            <div class="reg2-cardhead"><span class="reg2-num">01</span><span class="reg2-cardtitle">Dati paziente</span></div>
+            <div class="reg2-grid">${campiDati.map(c => field(c)).join('')}</div>
+            <div class="reg2-sesso">
+              <span>Sesso</span>
+              <label class="reg2-radio"><input type="radio" name="reg2-sesso" value="M"> M</label>
+              <label class="reg2-radio"><input type="radio" name="reg2-sesso" value="F"> F</label>
+            </div>
+          </div>
+
+          <!-- 02 Motivo della visita -->
+          <div class="reg2-card">
+            <div class="reg2-cardhead"><span class="reg2-num">02</span><span class="reg2-cardtitle">Motivo della visita</span></div>
+            <div class="reg2-motivi">
+              <label class="reg2-check"><input type="checkbox" data-field="motivo.controllo"> Visita di controllo</label>
+              <div>
+                <label class="reg2-check"><input type="checkbox" data-field="motivo._disturbi" id="reg2-chk-disturbi"> Disturbi visivi</label>
+                <input class="reg2-subinput" type="text" data-field="motivo.disturbi" placeholder="Descrivi i disturbi...">
+              </div>
+              <label class="reg2-check"><input type="checkbox" data-field="motivo.prescrizione"> Prescrizione occhiali/lenti</label>
+              <div>
+                <label class="reg2-check"><input type="checkbox" data-field="motivo._altro" id="reg2-chk-altro"> Altro</label>
+                <input class="reg2-subinput" type="text" data-field="motivo.altro" placeholder="Specifica...">
+              </div>
+            </div>
+          </div>
+
+          <!-- 03 Anamnesi -->
+          <div class="reg2-card">
+            <div class="reg2-cardhead"><span class="reg2-num">03</span><span class="reg2-cardtitle">Anamnesi</span></div>
+            <div class="reg2-anamnesi">
+              <div class="reg2-qrow">
+                <span>Ha mai avuto problemi agli occhi?</span>
+                <label class="reg2-radio"><input type="radio" name="reg2-prob" value="Sì"> Sì</label>
+                <label class="reg2-radio"><input type="radio" name="reg2-prob" value="No" checked> No</label>
+              </div>
+              <div class="reg2-qrow">
+                <span>Porta occhiali o lenti a contatto?</span>
+                <label class="reg2-radio"><input type="radio" name="reg2-lac" value="Sì"> Sì</label>
+                <label class="reg2-radio"><input type="radio" name="reg2-lac" value="No" checked> No</label>
+              </div>
+              ${campiAnamnesi.map(c => `
+                <div class="reg2-field full">
+                  <label>${c[1]}</label>
+                  <input class="reg2-input" type="text" data-field="${c[0]}" placeholder="${c[2]}">
+                </div>`).join('')}
+            </div>
+          </div>
+
+          <!-- Consenso -->
+          <div class="reg2-consent">
+            <label>
+              <input type="checkbox" id="reg2-consent-check">
+              <span>Ho letto e accetto l'<a id="reg2-apri-consenso">informativa sul trattamento dei dati personali e sanitari (GDPR)</a>.</span>
+            </label>
+          </div>
+
+          <button type="submit" class="reg2-submit">Invia registrazione</button>
+        </form>
+      </div>
+    </div>`;
+
+    const form = container.querySelector('#reg2-form');
+    const errEl = container.querySelector('#reg2-error');
+
+    // Link informativa → popup (senza uscire dal form)
+    container.querySelector('#reg2-apri-consenso').addEventListener('click', () => {
+      apriModaleConsenso(() => { container.querySelector('#reg2-consent-check').checked = true; });
+    });
+
+    // Campi testo Disturbi/Altro: visibili solo se la relativa checkbox è spuntata
+    [['reg2-chk-disturbi', 'motivo.disturbi'], ['reg2-chk-altro', 'motivo.altro']].forEach(([cid, fid]) => {
+      const c = form.querySelector('#' + cid);
+      const t = form.querySelector(`[data-field="${fid}"]`);
+      if (c && t) {
+        t.style.display = 'none';
+        c.addEventListener('change', () => { t.style.display = c.checked ? 'block' : 'none'; if (c.checked) t.focus(); });
+      }
+    });
+
+    function readForm() {
+      const v = (f) => { const el = form.querySelector(`[data-field="${f}"]`); return el ? el.value.trim() : ''; };
+      const chk = (f) => { const el = form.querySelector(`[data-field="${f}"]`); return el ? el.checked : false; };
+      const rad = (name, def) => { const el = form.querySelector(`input[name="${name}"]:checked`); return el ? el.value : (def || ''); };
+      return {
+        anagrafica: {
+          cognome: v('anagrafica.cognome'), nome: v('anagrafica.nome'), dataNascita: v('anagrafica.dataNascita'),
+          sesso: rad('reg2-sesso'), codiceFiscale: v('anagrafica.codiceFiscale'), comuneNascita: v('anagrafica.comuneNascita'),
+          indirizzo: v('anagrafica.indirizzo'), citta: v('anagrafica.citta'), telefono: v('anagrafica.telefono'), email: v('anagrafica.email')
+        },
+        motivo: {
+          controllo: chk('motivo.controllo'),
+          disturbi: chk('motivo._disturbi') ? (v('motivo.disturbi') || 'Sì') : '',
+          prescrizione: chk('motivo.prescrizione'),
+          altro: chk('motivo._altro') ? (v('motivo.altro') || 'Sì') : ''
+        },
+        anamnesi: {
+          problemiOcchi: rad('reg2-prob', 'No'), qualiProblemi: v('anamnesi.qualiProblemi'),
+          portaOcchiali: rad('reg2-lac', 'No'), daQuanto: v('anamnesi.daQuanto'),
+          malattie: v('anamnesi.malattie'), farmaci: v('anamnesi.farmaci'), interventi: v('anamnesi.interventi')
+        }
+      };
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const dati = readForm();
+      if (!dati.anagrafica.cognome) { errEl.textContent = 'Il campo Cognome è obbligatorio.'; return; }
+      if (!dati.anagrafica.nome) { errEl.textContent = 'Il campo Nome è obbligatorio.'; return; }
+      if (!dati.anagrafica.dataNascita) { errEl.textContent = 'Il campo Data di nascita è obbligatorio.'; return; }
+      if (dati.anagrafica.codiceFiscale) {
+        const cfCheck = validaCodiceFiscale(dati.anagrafica);
+        if (!cfCheck.ok) { errEl.textContent = cfCheck.msg; return; }
+      }
+      if (!container.querySelector('#reg2-consent-check').checked) {
+        errEl.textContent = 'Per inviare la registrazione deve accettare il consenso al trattamento dei dati.';
+        return;
+      }
+      errEl.textContent = '';
+      dati.consensoTrattamento = { accettato: true, ts: new Date().toISOString() };
+
       const p = { ...nuovoPaziente(), ...dati, stato: STATI.REGISTRATO };
       if (medicoPreassegnato) p.medicoAssegnato = medicoPreassegnato;
       const salvato = db.savePaziente(p);
       pushEvento(salvato.id, STATI.REGISTRATO);
       mostraConferma(nomeCompleto({ anagrafica: dati.anagrafica }) || dati.anagrafica.nome);
-    }
-  });
+    });
+  }
+
+  function mostraConferma(nome) {
+    const nomeMed = medicoPreassegnato && UTENTI[medicoPreassegnato] ? UTENTI[medicoPreassegnato].nome : null;
+    container.innerHTML = `
+    <div class="reg2-wrap">
+      <div class="reg2-doc">
+        <div class="reg2-header">${eyeSvg}<span class="brand">Studio Medico</span><span class="brand-sub">· Oculistica</span></div>
+        <div class="reg2-ok">
+          <div class="tick">✓</div>
+          <div class="t">Registrazione completata</div>
+          <div class="d">Grazie, <strong>${escapeHtml(nome)}</strong>. Attenda in sala d'attesa: ${nomeMed ? 'verrà chiamata a breve dallo <strong>' + nomeMed + '</strong>.' : 'verrà chiamata a breve dal medico.'}</div>
+          <button id="btn-nuova-reg">Nuova registrazione</button>
+        </div>
+      </div>
+    </div>`;
+    container.querySelector('#btn-nuova-reg').addEventListener('click', () => showView('registrazione'));
+  }
+
+  mostraForm();
 });
 
 // ── initFirmaCanvas ───────────────────────────────────────────────────────────
