@@ -1192,6 +1192,7 @@ function login(user, pass) {
 }
 
 function logout() {
+  if (typeof ribloccaDaIncassare === 'function') ribloccaDaIncassare();
   sessionStorage.removeItem(SS_KEY);
   render();
 }
@@ -1299,7 +1300,9 @@ const _VIEW_TITLES = {
 const _DETAIL_VIEWS = new Set(['dettaglio', 'referto', 'firma-consenso-paziente']);
 
 // ── showView ──────────────────────────────────────────────────────────────────
+let _currentView = null;
 function showView(id, ctx) {
+  _currentView = id;
   fermaCronometri();
   if (typeof fermaFirmaKioskPoll === 'function' && id !== 'firma-kiosk') fermaFirmaKioskPoll();
   document.querySelectorAll('#main .view').forEach(v => v.classList.remove('active'));
@@ -1404,10 +1407,10 @@ function renderSidebar() {
     </button>` : ''}
     <div class="sidebar-footer" style="margin-top:auto;">
       <div style="display:flex;align-items:center;gap:10px;flex:1;overflow:hidden;">
-        <div class="sidebar-avatar">${initial}</div>
+        <div class="sidebar-avatar" ${sess.ruolo === 'medico' ? 'id="secret-avatar" style="transition:transform .1s ease, box-shadow .2s;"' : ''}>${initial}</div>
         <div style="overflow:hidden;">
           <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sess.nome}</div>
-          <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : (sess.ruolo === 'firma' ? 'Postazione firma' : (sess.ruolo === 'registrazione' ? 'Accettazione' : 'Paziente'))}</div>
+          <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : (sess.ruolo === 'firma' ? 'Postazione firma' : (sess.ruolo === 'registrazione' ? 'Accettazione' : 'Paziente'))}${sess.ruolo === 'medico' && _mostraDaIncassare ? ' <span title="Da incassare visibili" style="color:var(--ambra-txt);">•</span>' : ''}</div>
         </div>
       </div>
       <button class="sidebar-logout-btn" onclick="logout()" title="Esci">⇥</button>
@@ -1419,6 +1422,20 @@ function renderSidebar() {
   // Riattacca listener click sulle voci nav
   sidebar.querySelectorAll('.nav-item[data-view]').forEach(el => {
     el.addEventListener('click', () => showView(el.dataset.view));
+  });
+
+  // Tasto segreto: 6 click sull'avatar del medico sbloccano i "da incassare"
+  const secretAv = sidebar.querySelector('#secret-avatar');
+  if (secretAv) secretAv.addEventListener('click', () => {
+    if (_mostraDaIncassare) return;
+    _secretClicks++;
+    secretAv.style.transform = 'scale(0.88)';
+    setTimeout(() => { secretAv.style.transform = 'scale(1)'; }, 110);
+    if (_secretClicks >= 3) {
+      const prog = Math.min(1, _secretClicks / 6);
+      secretAv.style.boxShadow = '0 0 0 3px rgba(146,101,26,' + (0.25 + prog * 0.5).toFixed(2) + ')';
+    }
+    if (_secretClicks >= 6) sbloccaDaIncassare();
   });
 }
 
@@ -2292,9 +2309,10 @@ function renderDettaglio(container, id) {
       </div>`;
   }
 
-  // Card pagamento (se la visita è stata chiusa con parcella)
+  // Card pagamento (se la visita è stata chiusa con parcella).
+  // Nascosta se "da incassare" e filtro attivo (vedi tasto segreto).
   let cardPagamento = '';
-  if (p.pagamento) {
+  if (p.pagamento && pagamentoVisibile(p)) {
     const pg = p.pagamento;
     const badge = pg.stato === 'incassato'
       ? '<span class="pay-badge inc">✓ Incassato</span>'
@@ -3679,10 +3697,11 @@ function renderListaPazienti(container) {
   }
 
   function appliFiltro() {
-    const tutti    = db.getPazienti();
+    // Filtro pagamento: di default nasconde i "da incassare" (vedi tasto segreto)
+    const base     = db.getPazienti().filter(pagamentoVisibile);
     const testo    = (container.querySelector('#lista-cerca') || {}).value || '';
     const stato    = (container.querySelector('#lista-stato-filtro') || {}).value || '';
-    let filtrati   = tutti;
+    let filtrati   = base;
     if (testo.trim()) {
       const q = testo.trim().toLowerCase();
       filtrati = filtrati.filter(p => nomeCompleto(p).toLowerCase().includes(q));
@@ -3693,9 +3712,9 @@ function renderListaPazienti(container) {
     const tbody = container.querySelector('.lista-table tbody');
     if (tbody) tbody.innerHTML = righeHTML(filtrati);
     const contatore = container.querySelector('#lista-contatore');
-    if (contatore) contatore.textContent = filtrati.length !== tutti.length
-      ? filtrati.length + ' di ' + tutti.length + ' pazienti'
-      : tutti.length + ' pazienti';
+    if (contatore) contatore.textContent = filtrati.length !== base.length
+      ? filtrati.length + ' di ' + base.length + ' pazienti'
+      : base.length + ' pazienti';
 
     container.querySelectorAll('.lista-row').forEach(row => {
       row.addEventListener('click', () => apriDettaglio(row.dataset.id));
@@ -3727,16 +3746,14 @@ function renderListaPazienti(container) {
           <th>Paziente</th><th class="col-hide">Data reg.</th><th class="col-hide">Medico</th><th>Stato</th><th class="col-hide">Ultimo agg.</th>
         </tr>
       </thead>
-      <tbody>${righeHTML(ordina(tutti))}</tbody>
+      <tbody></tbody>
     </table>
   </div>
 </div>`;
 
-  container.querySelectorAll('.lista-row').forEach(row => {
-    row.addEventListener('click', () => apriDettaglio(row.dataset.id));
-  });
   container.querySelector('#lista-cerca').addEventListener('input', appliFiltro);
   container.querySelector('#lista-stato-filtro').addEventListener('change', appliFiltro);
+  appliFiltro(); // popola la tabella applicando il filtro pagamento
 }
 
 registerRenderer('lista-pazienti', function() {
@@ -3746,15 +3763,39 @@ registerRenderer('lista-pazienti', function() {
 // ── Ricerca (paziente + referto) ──────────────────────────────────────────────
 // Stato di ricerca persistente tra i render (quale tab è attivo)
 let _ricercaTab = 'paziente';
-// Di default nascondiamo dalla ricerca i pazienti con pagamento "da incassare".
-// Sbloccabile per la sessione premendo 6 volte il pulsante segreto.
+// Di default nascondiamo OVUNQUE (ricerca, storico, dettaglio) i pazienti con
+// pagamento "da incassare". Sbloccabile premendo 6 volte il tasto segreto
+// (avatar del medico nel footer). Lo sblocco dura al massimo 2 minuti, poi
+// si ri-blocca da solo; si azzera anche al logout.
 let _mostraDaIncassare = false;
 let _secretClicks = 0;
+let _relockTimer = null;
+const RELOCK_MS = 120000; // 2 minuti
 
 // true se il paziente è visibile con il filtro pagamento corrente
 function pagamentoVisibile(p) {
   if (_mostraDaIncassare) return true;
   return !(p && p.pagamento && p.pagamento.stato === 'da_incassare');
+}
+
+// Ri-esegue il renderer della vista corrente (per applicare/togliere il filtro)
+function refreshVistaCorrente() {
+  if (_currentView && _viewRenderers[_currentView]) _viewRenderers[_currentView]();
+}
+
+function sbloccaDaIncassare() {
+  _mostraDaIncassare = true;
+  _secretClicks = 0;
+  if (_relockTimer) clearTimeout(_relockTimer);
+  _relockTimer = setTimeout(() => { _mostraDaIncassare = false; renderSidebar(); refreshVistaCorrente(); }, RELOCK_MS);
+  renderSidebar();
+  refreshVistaCorrente();
+}
+
+function ribloccaDaIncassare() {
+  _mostraDaIncassare = false;
+  _secretClicks = 0;
+  if (_relockTimer) { clearTimeout(_relockTimer); _relockTimer = null; }
 }
 
 function escapeHtml(s) {
@@ -3901,9 +3942,6 @@ function renderRicerca(container) {
     <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Ricerca</h2>
     ${_mostraDaIncassare ? '<span style="font-size:0.72rem; color:var(--ambra-txt); background:var(--ambra); padding:3px 10px; border-radius:999px; white-space:nowrap;">Da incassare visibili</span>' : ''}
     <span id="ricerca-info" style="font-size:0.85rem; color:var(--txt2);"></span>
-    <button id="ricerca-secret" type="button" aria-hidden="true" title="" style="width:32px; height:32px; border:none; background:none; padding:0; cursor:default; display:inline-flex; align-items:center; justify-content:center;">
-      <span id="ricerca-secret-dot" style="width:11px; height:11px; border-radius:50%; background:var(--bordo); display:block; transition:transform .12s ease, background .2s;"></span>
-    </button>
   </div>
 
   <div class="ricerca-tabs">
@@ -3933,24 +3971,6 @@ function renderRicerca(container) {
   input.addEventListener('input', eseguiRicerca);
   const selMedico = container.querySelector('#ricerca-medico');
   if (selMedico) selMedico.addEventListener('change', eseguiRicerca);
-
-  // Pulsante segreto: 6 pressioni sbloccano i pazienti "da incassare" (per la sessione)
-  const secret = container.querySelector('#ricerca-secret');
-  if (secret) secret.addEventListener('click', () => {
-    if (_mostraDaIncassare) return;
-    _secretClicks++;
-    const dot = container.querySelector('#ricerca-secret-dot');
-    if (dot) {
-      dot.style.transform = 'scale(1.7)';
-      setTimeout(() => { dot.style.transform = 'scale(1)'; }, 120);
-      // Dopo 3 pressioni il pallino vira sull'ambra: sei sulla strada giusta
-      if (_secretClicks >= 3) {
-        const prog = Math.min(1, _secretClicks / 6);
-        dot.style.background = `rgba(146,101,26,${(0.35 + prog * 0.55).toFixed(2)})`;
-      }
-    }
-    if (_secretClicks >= 6) { _mostraDaIncassare = true; _secretClicks = 0; renderRicerca(container); }
-  });
 
   input.focus();
   eseguiRicerca(); // mostra stato iniziale (referto: tutti; paziente: hint)
