@@ -1045,6 +1045,7 @@ function nuovoPaziente() {
     },
     referto: {
       apo: '', apg: '',
+      apoOD: '', apoOS: '', apgOD: '', apgOS: '',
       annessi: '', visusOD: '', visusOS: '',
       acuitaLontanoOD: '', acuitaLontanoOS: '',
       acuitaVicinoOD: '', acuitaVicinoOS: '',
@@ -2092,8 +2093,12 @@ function renderDettaglio(container, id) {
       <div class="card" style="margin-bottom:16px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid var(--bordo);">Referto</div>
         <div class="det-grid">
-          ${refRow('APO', r.apo)}
-          ${refRow('APG', r.apg)}
+          ${refRow('APO — OD', r.apoOD)}
+          ${refRow('APO — OS', r.apoOS)}
+          ${refRow('APG — OD', r.apgOD)}
+          ${refRow('APG — OS', r.apgOS)}
+          ${(!r.apoOD && !r.apoOS && r.apo) ? refRow('APO', r.apo) : ''}
+          ${(!r.apgOD && !r.apgOS && r.apg) ? refRow('APG', r.apg) : ''}
           ${refRow('Annessi', r.annessi)}
           ${refRow('Visus OD', r.visusOD)}
           ${refRow('Visus OS', r.visusOS)}
@@ -2571,13 +2576,29 @@ function renderReferto(container, id) {
     <!-- Anamnesi Clinica -->
     <div class="form-section">
       <h3>Anamnesi Clinica</h3>
-      <div class="form-field">
-        <label>APO — Anamnesi Patologica Oculare</label>
-        ${ta('referto.apo', r.apo, 'Descrivi...')}
+
+      <div style="font-size:0.85rem; font-weight:700; color:var(--txt); margin:4px 0 8px;">APO — Anamnesi Patologica Oculare</div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>OD — Occhio destro</label>
+          ${ta('referto.apoOD', r.apoOD || r.apo, 'Descrivi...')}
+        </div>
+        <div class="form-field">
+          <label>OS — Occhio sinistro</label>
+          ${ta('referto.apoOS', r.apoOS, 'Descrivi...')}
+        </div>
       </div>
-      <div class="form-field">
-        <label>APG — Anamnesi Patologica Generale</label>
-        ${ta('referto.apg', r.apg, 'Descrivi...')}
+
+      <div style="font-size:0.85rem; font-weight:700; color:var(--txt); margin:16px 0 8px;">APG — Anamnesi Patologica Generale</div>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>OD — Occhio destro</label>
+          ${ta('referto.apgOD', r.apgOD || r.apg, 'Descrivi...')}
+        </div>
+        <div class="form-field">
+          <label>OS — Occhio sinistro</label>
+          ${ta('referto.apgOS', r.apgOS, 'Descrivi...')}
+        </div>
       </div>
     </div>
 
@@ -2750,8 +2771,10 @@ function leggiRefertoDalForm(container) {
     return el ? el.value : '';
   }
   return {
-    apo:             val('referto.apo'),
-    apg:             val('referto.apg'),
+    apoOD:           val('referto.apoOD'),
+    apoOS:           val('referto.apoOS'),
+    apgOD:           val('referto.apgOD'),
+    apgOS:           val('referto.apgOS'),
     annessi:         val('referto.annessi'),
     visusOD:         val('referto.visusOD'),
     visusOS:         val('referto.visusOS'),
@@ -3344,8 +3367,10 @@ function costruisciDocReferto(id) {
   const r = p.referto || {};
   const n = p.anamnesi || {};
   sectionBar('ANAMNESI');
-  kv('APO — Anamnesi Patologica Oculare', r.apo);
-  kv('APG — Anamnesi Patologica Generale', r.apg);
+  kv('APO — Occhio destro (OD)', r.apoOD || (!r.apoOS ? r.apo : ''));
+  kv('APO — Occhio sinistro (OS)', r.apoOS);
+  kv('APG — Occhio destro (OD)', r.apgOD || (!r.apgOS ? r.apg : ''));
+  kv('APG — Occhio sinistro (OS)', r.apgOS);
   kv('Problemi agli occhi', (n.problemiOcchi || '') + (n.qualiProblemi ? ' — ' + n.qualiProblemi : ''));
   kv('Occhiali / lenti a contatto', (n.portaOcchiali || '') + (n.daQuanto ? ' — da ' + n.daQuanto : ''));
   kv('Malattie sistemiche', n.malattie);
@@ -3612,6 +3637,7 @@ function renderRicerca(container) {
       const r = p.referto || {};
       const campi = [
         ['Diagnosi e prescrizione', r.diagnosi],
+        ['APO OD', r.apoOD], ['APO OS', r.apoOS], ['APG OD', r.apgOD], ['APG OS', r.apgOS],
         ['APO', r.apo], ['APG', r.apg],
         ['Annessi e segmento anteriore', r.annessi],
         ['Fundus OD', r.fundusOD], ['Fundus OS', r.fundusOS],
