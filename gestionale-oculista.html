@@ -3901,7 +3901,9 @@ function renderRicerca(container) {
     <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Ricerca</h2>
     ${_mostraDaIncassare ? '<span style="font-size:0.72rem; color:var(--ambra-txt); background:var(--ambra); padding:3px 10px; border-radius:999px; white-space:nowrap;">Da incassare visibili</span>' : ''}
     <span id="ricerca-info" style="font-size:0.85rem; color:var(--txt2);"></span>
-    <span id="ricerca-secret" aria-hidden="true" style="width:14px; height:14px; border-radius:50%; cursor:default; color:var(--bordo); user-select:none; font-size:0.75rem; line-height:14px; text-align:center;">•</span>
+    <button id="ricerca-secret" type="button" aria-hidden="true" title="" style="width:32px; height:32px; border:none; background:none; padding:0; cursor:default; display:inline-flex; align-items:center; justify-content:center;">
+      <span id="ricerca-secret-dot" style="width:11px; height:11px; border-radius:50%; background:var(--bordo); display:block; transition:transform .12s ease, background .2s;"></span>
+    </button>
   </div>
 
   <div class="ricerca-tabs">
@@ -3937,6 +3939,16 @@ function renderRicerca(container) {
   if (secret) secret.addEventListener('click', () => {
     if (_mostraDaIncassare) return;
     _secretClicks++;
+    const dot = container.querySelector('#ricerca-secret-dot');
+    if (dot) {
+      dot.style.transform = 'scale(1.7)';
+      setTimeout(() => { dot.style.transform = 'scale(1)'; }, 120);
+      // Dopo 3 pressioni il pallino vira sull'ambra: sei sulla strada giusta
+      if (_secretClicks >= 3) {
+        const prog = Math.min(1, _secretClicks / 6);
+        dot.style.background = `rgba(146,101,26,${(0.35 + prog * 0.55).toFixed(2)})`;
+      }
+    }
     if (_secretClicks >= 6) { _mostraDaIncassare = true; _secretClicks = 0; renderRicerca(container); }
   });
 
