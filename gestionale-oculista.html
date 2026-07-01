@@ -3746,6 +3746,16 @@ registerRenderer('lista-pazienti', function() {
 // ── Ricerca (paziente + referto) ──────────────────────────────────────────────
 // Stato di ricerca persistente tra i render (quale tab è attivo)
 let _ricercaTab = 'paziente';
+// Di default nascondiamo dalla ricerca i pazienti con pagamento "da incassare".
+// Sbloccabile per la sessione premendo 6 volte il pulsante segreto.
+let _mostraDaIncassare = false;
+let _secretClicks = 0;
+
+// true se il paziente è visibile con il filtro pagamento corrente
+function pagamentoVisibile(p) {
+  if (_mostraDaIncassare) return true;
+  return !(p && p.pagamento && p.pagamento.stato === 'da_incassare');
+}
 
 function escapeHtml(s) {
   return String(s == null ? '' : s)
@@ -3794,7 +3804,7 @@ function renderRicerca(container) {
       const match = campi.find(([, v]) => v && String(v).toLowerCase().includes(query));
       if (!match) return null;
       return { p, label: match[0], valore: match[1] };
-    }).filter(Boolean);
+    }).filter(item => item && pagamentoVisibile(item.p));
   }
 
   // ── Ricerca REFERTO: cerca sul contenuto clinico, solo pazienti refertati ──
@@ -3822,7 +3832,7 @@ function renderRicerca(container) {
       const match = campi.find(([, v]) => v && String(v).toLowerCase().includes(query));
       if (!match) return null;
       return { p, label: match[0], valore: match[1] };
-    }).filter(Boolean);
+    }).filter(item => item && pagamentoVisibile(item.p));
   }
 
   function rigaRisultato(item, q, mostraMedico) {
@@ -3887,9 +3897,11 @@ function renderRicerca(container) {
 
   container.innerHTML = `
 <div style="max-width:820px;">
-  <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+  <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
     <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Ricerca</h2>
+    ${_mostraDaIncassare ? '<span style="font-size:0.72rem; color:var(--ambra-txt); background:var(--ambra); padding:3px 10px; border-radius:999px; white-space:nowrap;">Da incassare visibili</span>' : ''}
     <span id="ricerca-info" style="font-size:0.85rem; color:var(--txt2);"></span>
+    <span id="ricerca-secret" aria-hidden="true" style="width:14px; height:14px; border-radius:50%; cursor:default; color:var(--bordo); user-select:none; font-size:0.75rem; line-height:14px; text-align:center;">•</span>
   </div>
 
   <div class="ricerca-tabs">
@@ -3919,6 +3931,14 @@ function renderRicerca(container) {
   input.addEventListener('input', eseguiRicerca);
   const selMedico = container.querySelector('#ricerca-medico');
   if (selMedico) selMedico.addEventListener('change', eseguiRicerca);
+
+  // Pulsante segreto: 6 pressioni sbloccano i pazienti "da incassare" (per la sessione)
+  const secret = container.querySelector('#ricerca-secret');
+  if (secret) secret.addEventListener('click', () => {
+    if (_mostraDaIncassare) return;
+    _secretClicks++;
+    if (_secretClicks >= 6) { _mostraDaIncassare = true; _secretClicks = 0; renderRicerca(container); }
+  });
 
   input.focus();
   eseguiRicerca(); // mostra stato iniziale (referto: tutti; paziente: hint)
