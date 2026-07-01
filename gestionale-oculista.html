@@ -166,6 +166,26 @@
     .modal-foot .btn { border-radius: 999px; }
     .modal-foot .btn.btn-primary { background: #16150f; border-color: #16150f; color: #f4f3f0; }
 
+    /* ── Pagamento / chiusura visita ── */
+    .pay-row { display: grid; grid-template-columns: 1fr 120px 34px; gap: 8px; margin-bottom: 8px; align-items: center; }
+    .pay-row input { height: 40px; padding: 0 10px; border: 1px solid #e2e0d8; border-radius: 9px; background: #fbfbf9; font-family: 'Geist', sans-serif; font-size: 13.5px; color: #16150f; outline: none; }
+    .pay-row input:focus { border-color: #16150f; }
+    .pay-row .pay-imp { text-align: right; font-variant-numeric: tabular-nums; }
+    .pay-row .rm { width: 34px; height: 34px; border: 1px solid var(--bordo); border-radius: 8px; background: #fff; cursor: pointer; color: var(--txt2); font-size: 1rem; line-height: 1; }
+    .pay-row .rm:hover { border-color: var(--rosso); color: var(--rosso); }
+    .pay-add { margin-top: 4px; font-size: 12.5px; color: #16150f; background: none; border: 1px dashed #cfcdc4; border-radius: 9px; padding: 8px 12px; cursor: pointer; }
+    .pay-sconto { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+    .pay-tot { display: flex; justify-content: space-between; align-items: baseline; margin-top: 14px; padding-top: 12px; border-top: 1px solid #e2e0d8; }
+    .pay-tot .lab { font-size: 0.8rem; color: var(--txt2); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .pay-tot .val { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; color: #16150f; }
+    .pay-labels { display: flex; gap: 10px; }
+    .pay-lbl { flex: 1; padding: 12px; border-radius: 12px; border: 1.5px solid var(--bordo); background: #fff; cursor: pointer; font-size: 0.9rem; font-weight: 600; text-align: center; color: var(--txt2); }
+    .pay-lbl.sel-inc { border-color: #1e7e45; background: #e6f7ed; color: #1e7e45; }
+    .pay-lbl.sel-att { border-color: var(--ambra-txt); background: var(--ambra); color: var(--ambra-txt); }
+    .pay-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .pay-badge.inc { background: #e6f7ed; color: #1e7e45; }
+    .pay-badge.att { background: var(--ambra); color: var(--ambra-txt); }
+
     /* ── Registrazione redesign (variante 1b — cards numerate) ── */
     .reg2-wrap { max-width: 860px; margin: 0 auto; }
     .reg2-doc { background: #efeee7; border-radius: 24px; overflow: hidden; font-family: 'Geist', system-ui, sans-serif; color: #16150f; }
@@ -1055,6 +1075,7 @@ function nuovoPaziente() {
       fundusOD: '', fundusOS: '', altriEsami: '', noteMedico: '', diagnosi: ''
     },
     firmaConsenso: null,
+    pagamento: null,
     eventi: [],
     createdAt: null,
     updatedAt: null
@@ -1989,6 +2010,116 @@ function setStato(id, stato) {
   showView('board');
 }
 
+// ── Pagamento / chiusura visita ───────────────────────────────────────────────
+function fmtEuro(n) {
+  const v = (typeof n === 'number') ? n : parseFloat(String(n == null ? '' : n).replace(',', '.'));
+  return (isFinite(v) ? v : 0).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const PRESTAZIONI_COMUNI = ['Visita oculistica', 'Visita oculistica di controllo', 'Tonometria', 'Campo visivo', 'OCT', 'Fondo oculare', 'Topografia corneale', 'Pachimetria', 'Rimozione corpo estraneo', 'Certificato'];
+
+// Apre il modale di chiusura visita con parcellazione, sconto e stato pagamento.
+// Alla conferma salva il pagamento e porta il paziente a "Completato".
+function completaVisita(id, onDone) {
+  const p = db.getPaziente(id);
+  if (!p) return;
+  const pag = p.pagamento || {};
+  let righe = (pag.prestazioni && pag.prestazioni.length) ? pag.prestazioni.map(x => ({ descrizione: x.descrizione || '', importo: x.importo != null ? String(x.importo) : '' })) : [{ descrizione: '', importo: '' }];
+  let scontoVal = pag.sconto != null ? String(pag.sconto) : '';
+  let statoPag = pag.stato || '';
+
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.id = 'pay-modal';
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+
+  const num = (s) => { const v = parseFloat(String(s).replace(',', '.')); return isFinite(v) ? v : 0; };
+  function totale() {
+    const somma = righe.reduce((s, r) => s + num(r.importo), 0);
+    return Math.max(0, somma - num(scontoVal));
+  }
+  function leggiDOM() {
+    ov.querySelectorAll('.pay-row').forEach((row, i) => {
+      if (!righe[i]) return;
+      righe[i].descrizione = row.querySelector('.pay-desc').value;
+      righe[i].importo = row.querySelector('.pay-imp').value;
+    });
+    const sc = ov.querySelector('#pay-sconto'); if (sc) scontoVal = sc.value;
+  }
+  function aggiornaTotale() {
+    leggiDOM();
+    const t = ov.querySelector('#pay-totale'); if (t) t.textContent = '€ ' + fmtEuro(totale());
+  }
+  function draw() {
+    ov.innerHTML = `
+      <div class="modal-box" role="dialog" aria-modal="true" aria-label="Chiusura visita">
+        <div class="modal-head">
+          <h3>Chiusura visita — Pagamento</h3>
+          <button type="button" class="modal-x" aria-label="Chiudi" id="pay-x">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#8a897f; margin-bottom:10px;">Prestazioni effettuate</div>
+          <div id="pay-righe">
+            ${righe.map((r, i) => `
+              <div class="pay-row" data-i="${i}">
+                <input class="pay-desc" list="pay-datalist" placeholder="Prestazione" value="${escapeHtml(r.descrizione)}">
+                <input class="pay-imp" inputmode="decimal" placeholder="€ 0,00" value="${escapeHtml(r.importo)}">
+                <button type="button" class="rm" title="Rimuovi" data-rm="${i}">×</button>
+              </div>`).join('')}
+          </div>
+          <datalist id="pay-datalist">${PRESTAZIONI_COMUNI.map(x => `<option value="${x}">`).join('')}</datalist>
+          <button type="button" class="pay-add" id="pay-add">+ Aggiungi prestazione</button>
+
+          <div class="pay-sconto">
+            <span style="font-size:0.85rem; color:var(--txt2);">Sconto €</span>
+            <input id="pay-sconto" inputmode="decimal" placeholder="0,00" value="${escapeHtml(scontoVal)}" style="height:38px; width:120px; padding:0 10px; border:1px solid #e2e0d8; border-radius:9px; background:#fbfbf9; font-family:'Geist',sans-serif; font-size:13.5px; outline:none;">
+          </div>
+
+          <div class="pay-tot">
+            <span class="lab">Totale</span>
+            <span class="val" id="pay-totale">€ ${fmtEuro(totale())}</span>
+          </div>
+
+          <div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:#8a897f; margin:18px 0 8px;">Stato pagamento *</div>
+          <div class="pay-labels">
+            <button type="button" class="pay-lbl ${statoPag === 'incassato' ? 'sel-inc' : ''}" data-stato="incassato">✓ Incassato</button>
+            <button type="button" class="pay-lbl ${statoPag === 'da_incassare' ? 'sel-att' : ''}" data-stato="da_incassare">● Da incassare</button>
+          </div>
+          <div id="pay-err" style="color:#b23a2f; font-size:12.5px; margin-top:10px; min-height:0;"></div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn" id="pay-annulla">Annulla</button>
+          <button type="button" class="btn btn-primary" id="pay-conferma">Conferma e chiudi visita</button>
+        </div>
+      </div>`;
+
+    ov.querySelector('#pay-x').onclick = chiudi;
+    ov.querySelector('#pay-annulla').onclick = chiudi;
+    ov.querySelector('#pay-add').onclick = () => { leggiDOM(); righe.push({ descrizione: '', importo: '' }); draw(); };
+    ov.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { leggiDOM(); righe.splice(Number(b.dataset.rm), 1); if (!righe.length) righe.push({ descrizione: '', importo: '' }); draw(); });
+    ov.querySelectorAll('.pay-imp, #pay-sconto').forEach(el => el.addEventListener('input', aggiornaTotale));
+    ov.querySelectorAll('.pay-lbl').forEach(b => b.onclick = () => { leggiDOM(); statoPag = b.dataset.stato; draw(); });
+    ov.querySelector('#pay-conferma').onclick = conferma;
+  }
+  function chiudi() { ov.remove(); document.body.style.overflow = ''; }
+  function conferma() {
+    leggiDOM();
+    if (!statoPag) { ov.querySelector('#pay-err').textContent = 'Seleziona lo stato del pagamento (Incassato o Da incassare) per chiudere la visita.'; return; }
+    const prestazioni = righe
+      .map(r => ({ descrizione: (r.descrizione || '').trim(), importo: num(r.importo) }))
+      .filter(r => r.descrizione || r.importo);
+    const pagamento = { prestazioni, sconto: num(scontoVal), totale: totale(), stato: statoPag, ts: new Date().toISOString() };
+    db.updatePaziente(id, { pagamento });
+    pushEvento(id, STATI.COMPLETATO);
+    chiudi();
+    if (typeof onDone === 'function') onDone();
+  }
+
+  ov.addEventListener('click', (e) => { if (e.target === ov) chiudi(); });
+  draw();
+}
+
 // ── renderTimeline ────────────────────────────────────────────────────────────
 function renderTimeline(eventi) {
   if (!eventi || eventi.length === 0) {
@@ -2161,6 +2292,32 @@ function renderDettaglio(container, id) {
       </div>`;
   }
 
+  // Card pagamento (se la visita è stata chiusa con parcella)
+  let cardPagamento = '';
+  if (p.pagamento) {
+    const pg = p.pagamento;
+    const badge = pg.stato === 'incassato'
+      ? '<span class="pay-badge inc">✓ Incassato</span>'
+      : '<span class="pay-badge att">● Da incassare</span>';
+    const righe = (pg.prestazioni || []).map(r =>
+      `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:0.88rem;border-bottom:1px solid rgba(0,0,0,.05);">
+         <span>${escapeHtml(r.descrizione || '—')}</span>
+         <span style="font-variant-numeric:tabular-nums;">€ ${fmtEuro(r.importo)}</span>
+       </div>`).join('');
+    const scontoRow = pg.sconto ? `<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:0.88rem;color:var(--txt2);"><span>Sconto</span><span style="font-variant-numeric:tabular-nums;">− € ${fmtEuro(pg.sconto)}</span></div>` : '';
+    cardPagamento = `
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--bordo);display:flex;justify-content:space-between;align-items:center;gap:8px;"><span>Pagamento</span>${badge}</div>
+        ${righe || '<div style="font-size:0.85rem;color:var(--txt2);">Nessuna prestazione registrata.</div>'}
+        ${scontoRow}
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;padding-top:10px;border-top:1px solid var(--bordo);">
+          <span style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);">Totale</span>
+          <span style="font-size:1.2rem;font-weight:700;font-variant-numeric:tabular-nums;">€ ${fmtEuro(pg.totale)}</span>
+        </div>
+        ${pg.stato === 'da_incassare' ? `<button class="btn" id="det-btn-incassato" style="margin-top:14px;">Segna come incassato</button>` : ''}
+      </div>`;
+  }
+
   container.innerHTML = `
     <div style="max-width:760px;">
       <!-- Header -->
@@ -2225,6 +2382,9 @@ function renderDettaglio(container, id) {
 
       <!-- Consenso -->
       ${cardConsenso}
+
+      <!-- Pagamento -->
+      ${cardPagamento}
 
       <!-- Timeline -->
       <div class="card" style="margin-bottom:16px;">
@@ -2311,8 +2471,19 @@ function renderDettaglio(container, id) {
   const btnCompleta = container.querySelector('#det-btn-completa');
   if (btnCompleta) {
     btnCompleta.onclick = () => {
-      pushEvento(id, STATI.COMPLETATO);
-      renderDettaglio(container, id);
+      completaVisita(id, () => renderDettaglio(container, id));
+    };
+  }
+
+  // Segna pagamento come incassato
+  const btnIncassato = container.querySelector('#det-btn-incassato');
+  if (btnIncassato) {
+    btnIncassato.onclick = () => {
+      const pz = db.getPaziente(id);
+      if (pz && pz.pagamento) {
+        db.updatePaziente(id, { pagamento: { ...pz.pagamento, stato: 'incassato' } });
+        renderDettaglio(container, id);
+      }
     };
   }
 
@@ -2391,7 +2562,7 @@ function renderBoard(container, filtroSoloAttesa) {
       destra = `<span class="bd2-info">${info}</span>`;
       quick = p.stato === STATI.COMPLETATO
         ? `<button class="bd2-quick" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>`
-        : `<button class="bd2-quick" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.COMPLETATO}')">Completa</button>`;
+        : `<button class="bd2-quick" onclick="event.stopPropagation(); completaVisita('${p.id}', ()=>showView('board'))">Completa</button>`;
     }
 
     return `
@@ -3798,7 +3969,7 @@ registerRenderer('da-firmare', function() {
     const data   = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString('it-IT') : '—';
     const azioni = mostraPDF
       ? `<button class="btn btn-primary" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>
-         <button class="btn" onclick="event.stopPropagation(); pushEvento('${p.id}', '${STATI.COMPLETATO}'); showView('da-firmare')">Completa</button>`
+         <button class="btn" onclick="event.stopPropagation(); completaVisita('${p.id}', ()=>showView('da-firmare'))">Completa</button>`
       : `<button class="btn" onclick="event.stopPropagation(); generaPDF('${p.id}')">Genera PDF</button>`;
     return `
       <div class="board-row" onclick="apriDettaglio('${p.id}')" title="Apri dettaglio">
@@ -3836,7 +4007,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v5'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v6'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -3972,6 +4143,14 @@ function seedDemoData() {
     if (stato === STATI.CONSENSO || stato === STATI.COMPLETATO) p.firmaConsenso = firmaFinta();
     // Consenso al trattamento accettato in registrazione (demo: ~85% sì, alcuni no)
     if (rand() > 0.15) p.consensoTrattamento = { accettato: true, ts: ago(minutiFa + 4) };
+    // Pagamento: le visite completate hanno una parcella (demo, mix incassato/da incassare)
+    if (stato === STATI.COMPLETATO) {
+      const pres = [{ descrizione: 'Visita oculistica', importo: pick([80, 100, 120, 130, 150]) }];
+      if (rand() > 0.55) pres.push({ descrizione: pick(['OCT', 'Campo visivo', 'Tonometria', 'Topografia corneale']), importo: pick([40, 50, 60, 80]) });
+      const sconto = rand() > 0.8 ? pick([10, 20]) : 0;
+      const totale = Math.max(0, pres.reduce((s, r) => s + r.importo, 0) - sconto);
+      p.pagamento = { prestazioni: pres, sconto, totale, stato: rand() > 0.3 ? 'incassato' : 'da_incassare', ts: ago(minutiFa) };
+    }
     db._save([...db.getPazienti(), p]);
   }
 
