@@ -193,8 +193,9 @@
     .reg2-motivi { display: flex; flex-direction: column; gap: 13px; }
     .reg2-subinput { margin-top: 8px; margin-left: 28px; height: 38px; padding: 0 12px; border: 1px solid #e2e0d8; border-radius: 9px; background: #fbfbf9; font-family: 'Geist', sans-serif; font-size: 13px; width: calc(100% - 28px); outline: none; }
     .reg2-anamnesi { display: flex; flex-direction: column; gap: 16px; }
-    .reg2-qrow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .reg2-qrow { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; }
     .reg2-qrow > span { font-size: 13.5px; color: #54534b; }
+    .reg2-radios { display: inline-flex; align-items: center; gap: 18px; flex-shrink: 0; }
     .reg2-consent { background: #fbf3df; border: 1px solid #e7d9ad; border-radius: 16px; padding: 22px; margin-bottom: 22px; }
     .reg2-consent label { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
     .reg2-consent input { margin-top: 3px; width: 19px; height: 19px; flex-shrink: 0; cursor: pointer; }
@@ -2888,13 +2889,17 @@ function renderRegistrazione2(container, cfg) {
             <div class="reg2-anamnesi">
               <div class="reg2-qrow">
                 <span>Ha mai avuto problemi agli occhi?</span>
-                <label class="reg2-radio"><input type="radio" name="reg2-prob" value="Sì"> Sì</label>
-                <label class="reg2-radio"><input type="radio" name="reg2-prob" value="No" checked> No</label>
+                <span class="reg2-radios">
+                  <label class="reg2-radio"><input type="radio" name="reg2-prob" value="Sì"> Sì</label>
+                  <label class="reg2-radio"><input type="radio" name="reg2-prob" value="No" checked> No</label>
+                </span>
               </div>
               <div class="reg2-qrow">
                 <span>Porta occhiali o lenti a contatto?</span>
-                <label class="reg2-radio"><input type="radio" name="reg2-lac" value="Sì"> Sì</label>
-                <label class="reg2-radio"><input type="radio" name="reg2-lac" value="No" checked> No</label>
+                <span class="reg2-radios">
+                  <label class="reg2-radio"><input type="radio" name="reg2-lac" value="Sì"> Sì</label>
+                  <label class="reg2-radio"><input type="radio" name="reg2-lac" value="No" checked> No</label>
+                </span>
               </div>
               ${campiAnamnesi.map(c => `
                 <div class="reg2-field full">
