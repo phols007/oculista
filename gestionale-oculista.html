@@ -1246,9 +1246,11 @@ function _ensureOCR() {
 // Legge il codice fiscale STAMPATO su una foto della tessera (funziona con
 // qualsiasi tessera: il CF è sempre scritto in chiaro, anche quando il barcode
 // contiene solo il numero della tessera).
-async function _ocrCodiceFiscaleDaFoto(file) {
+async function _ocrCodiceFiscaleDaFoto(file, onProgress) {
   const T = await _ensureOCR();
-  const worker = await T.createWorker('eng');
+  const worker = await T.createWorker('eng', 1, {
+    logger: (m) => { if (onProgress && m && typeof m.progress === 'number') onProgress(m.status || '', m.progress); }
+  });
   try {
     await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' });
     const { data } = await worker.recognize(file);
@@ -1291,31 +1293,40 @@ function apriScanTessera(onTrovato) {
     fotoInput.addEventListener('change', () => {
       const file = fotoInput.files && fotoInput.files[0];
       if (!file) return;
-      setMsg('Analisi della foto in corso…');
+      setMsg('Analisi della foto…');
       const trovato = (dec) => { chiudiScanTessera(); onTrovato(dec); };
+      // Evita blocchi: se una promessa non risponde entro N ms, si prosegue.
+      const conTimeout = (p, ms) => Promise.race([ Promise.resolve(p), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)) ]);
+      let _ocrFatto = false;
       // 2° tentativo: leggi il CF SCRITTO sulla tessera con l'OCR (funziona anche
       // quando il barcode contiene solo il numero della tessera).
       const provaOCR = () => {
-        setMsg('Leggo il codice fiscale scritto sulla tessera… (qualche secondo)');
-        _ocrCodiceFiscaleDaFoto(file)
+        if (_ocrFatto) return; _ocrFatto = true;
+        setMsg('Preparo il lettore del codice fiscale…');
+        _ocrCodiceFiscaleDaFoto(file, (status, prog) => {
+          const pct = Math.round((prog || 0) * 100);
+          if (/recogn/i.test(status)) setMsg('Leggo il codice fiscale… ' + pct + '%');
+          else setMsg('Preparo il lettore… ' + pct + '% (solo la prima volta)');
+        })
           .then((testo) => {
             const dec = decodeCodiceFiscale(testo);
             if (dec) { trovato(dec); return; }
-            setMsg('Non sono riuscito a leggere il codice fiscale dalla foto. Riprova inquadrando bene il CF (16 caratteri) o la sua barra, ben a fuoco. In alternativa scrivilo a mano.');
+            setMsg('Non sono riuscito a leggere il codice fiscale dalla foto. Rifalla nitida e ravvicinata sul CF (16 caratteri), oppure scrivilo a mano: data di nascita e sesso si compilano da soli.');
           })
-          .catch(() => setMsg('OCR non disponibile ora. Scrivi il codice fiscale a mano: data di nascita e sesso si compilano da soli.'));
+          .catch(() => setMsg('Lettore non disponibile ora (serve connessione). Scrivi il codice fiscale a mano: data di nascita e sesso si compilano da soli.'));
       };
-      // 1° tentativo: barcode dalla foto.
+      // 1° tentativo: barcode dalla foto, ma con timeout: su iOS scanFile può
+      // impiantarsi senza mai rispondere → dopo 6s si passa all'OCR.
       const analizza = () => {
         const fmts = _fmtList();
         const fileScanner = new Html5Qrcode('ts-scan-area', fmts ? { formatsToSupport: fmts } : undefined);
-        fileScanner.scanFile(file, false)
+        conTimeout(fileScanner.scanFile(file, false), 6000)
           .then((testo) => {
             const dec = decodeCodiceFiscale(testo);
             if (dec) { trovato(dec); return; }
             provaOCR(); // barcode letto ma non è un CF (es. numero tessera) → OCR
           })
-          .catch(() => provaOCR()); // nessun barcode leggibile → OCR
+          .catch(() => provaOCR()); // nessun barcode leggibile o timeout → OCR
       };
       // Ferma prima lo scanner dal vivo (async) per liberare l'area di rendering.
       if (_tsScanner) { const s = _tsScanner; _tsScanner = null; Promise.resolve(s.stop()).catch(() => {}).then(analizza); }
