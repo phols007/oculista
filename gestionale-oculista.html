@@ -3473,6 +3473,23 @@ function renderRegistrazione2(container, cfg) {
       apriModaleConsenso(() => { container.querySelector('#reg2-consent-check').checked = true; });
     });
 
+    // Compila data di nascita e sesso a partire dal codice fiscale (dec).
+    const compilaDaCF = (dec) => {
+      const dn = form.querySelector('[data-field="anagrafica.dataNascita"]');
+      if (dn && !dn.value.trim()) dn.value = dec.dataNascita;
+      const rad = form.querySelector(`input[name="reg2-sesso"][value="${dec.sesso}"]`);
+      if (rad) rad.checked = true;
+    };
+
+    // Digitando o INCOLLANDO il codice fiscale → compila da solo data e sesso.
+    // Metodo più affidabile su iPhone, senza fotocamera né librerie.
+    const cfField = form.querySelector('[data-field="anagrafica.codiceFiscale"]');
+    if (cfField) {
+      const autoCF = () => { const dec = decodeCodiceFiscale(cfField.value); if (dec) compilaDaCF(dec); };
+      cfField.addEventListener('input', autoCF);
+      cfField.addEventListener('change', autoCF);
+    }
+
     // Scansione tessera sanitaria → compila CF, data di nascita e sesso
     const scanBtn = container.querySelector('#reg2-scan-ts');
     if (scanBtn) scanBtn.addEventListener('click', () => apriScanTessera((dec) => {
