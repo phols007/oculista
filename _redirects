@@ -1,0 +1,3 @@
+# Rewrite della root sul gestionale (URL pulito) — formato valido sia per
+# Cloudflare Pages sia per Netlify.
+/  /gestionale-oculista.html  200
