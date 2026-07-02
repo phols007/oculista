@@ -1,4 +1,5 @@
 name: Deploy su GitHub Pages
+# trigger: 2026-07-02T19:02:42Z
 
 # Pubblica il gestionale (sito statico a singolo file) su GitHub Pages
 # ad ogni push su main. Il primo run abilita Pages da solo (enablement: true),
