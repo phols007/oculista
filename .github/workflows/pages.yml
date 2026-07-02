@@ -1,0 +1,48 @@
+name: Deploy su GitHub Pages
+
+# Pubblica il gestionale (sito statico a singolo file) su GitHub Pages
+# ad ogni push su main. Il primo run abilita Pages da solo (enablement: true),
+# così non serve toccare le impostazioni del repository a mano.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un deploy per volta; non annullare quello in corso.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Timbra la versione (data + commit) nell'HTML
+        run: |
+          sed -i "s|__BUILD__|$(date -u +%d/%m/%Y) · ${GITHUB_SHA::7}|g" gestionale-oculista.html
+
+      - name: Configura Pages (abilita al primo run)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Carica il sito
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
