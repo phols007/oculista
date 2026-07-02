@@ -222,6 +222,8 @@
     .reg2-error { color: #b23a2f; font-size: 12.5px; margin-bottom: 14px; min-height: 0; }
     .reg2-card { background: #fff; border: 1px solid #e2e0d8; border-radius: 16px; padding: 22px; margin-bottom: 18px; }
     .reg2-cardhead { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .reg2-scan { margin-left: auto; font-family: 'Geist Mono', monospace; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; background: #fff; border: 1px solid #d6d4cb; border-radius: 999px; padding: 7px 12px; cursor: pointer; color: #16150f; white-space: nowrap; }
+    .reg2-scan:hover { border-color: #16150f; }
     .reg2-num { width: 24px; height: 24px; border-radius: 50%; background: #16150f; color: #f4f3f0; font-family: 'Geist Mono', monospace; font-size: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .reg2-cardtitle { font-family: 'Geist Mono', monospace; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #54534b; }
     .reg2-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
@@ -970,6 +972,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- QRCode.js CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- html5-qrcode CDN (scansione codice a barre tessera sanitaria) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
 <script>
 // ── Costanti ──────────────────────────────────────────────────────────────────
@@ -1178,6 +1182,77 @@ function nomeCompleto(p) {
 }
 
 // ── validaCodiceFiscale ───────────────────────────────────────────────────────
+// ── Decodifica Codice Fiscale → data di nascita e sesso (con omocodia) ───────
+function decodeCodiceFiscale(cfRaw) {
+  const cf = (cfRaw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z0-9]{4}[A-Z]$/.test(cf)) return null;
+  const OMO = { L: '0', M: '1', N: '2', P: '3', Q: '4', R: '5', S: '6', T: '7', U: '8', V: '9' };
+  const dig = c => /[0-9]/.test(c) ? c : (OMO[c] || '');
+  const MESI = { A: '01', B: '02', C: '03', D: '04', E: '05', H: '06', L: '07', M: '08', P: '09', R: '10', S: '11', T: '12' };
+  const mese = MESI[cf[8]];
+  let giorno = parseInt(dig(cf[9]) + dig(cf[10]), 10);
+  if (!mese || isNaN(giorno)) return null;
+  const sesso = giorno > 40 ? 'F' : 'M';
+  if (giorno > 40) giorno -= 40;
+  if (giorno < 1 || giorno > 31) return null;
+  const yy = parseInt(dig(cf[6]) + dig(cf[7]), 10);
+  if (isNaN(yy)) return null;
+  // Secolo: euristica — anni ≤ anno corrente → 2000, altrimenti 1900
+  const anno = yy <= (new Date().getFullYear() % 100) ? 2000 + yy : 1900 + yy;
+  return { codiceFiscale: cf, dataNascita: String(giorno).padStart(2, '0') + '/' + mese + '/' + anno, sesso };
+}
+
+// ── Scanner tessera sanitaria (barcode Code 39 col CF) ───────────────────────
+let _tsScanner = null;
+function apriScanTessera(onTrovato) {
+  chiudiScanTessera();
+  const ov = document.createElement('div');
+  ov.className = 'modal-overlay';
+  ov.id = 'ts-modal';
+  ov.innerHTML = `
+    <div class="modal-box" style="max-width:520px;">
+      <div class="modal-head">
+        <h3>Scansiona la tessera sanitaria</h3>
+        <button type="button" class="modal-x" aria-label="Chiudi" onclick="chiudiScanTessera()">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px;">Inquadra il <strong>codice a barre</strong> stampato sulla tessera (accanto al codice fiscale). Verranno compilati CF, data di nascita e sesso.</p>
+        <div id="ts-scan-area" style="width:100%; min-height:240px; background:#0b0b0c; border-radius:12px; overflow:hidden;"></div>
+        <div id="ts-scan-msg" style="font-size:12.5px; color:var(--txt2); margin-top:10px;">Avvio fotocamera…</div>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  ov.addEventListener('click', e => { if (e.target === ov) chiudiScanTessera(); });
+
+  const setMsg = (t) => { const m = document.getElementById('ts-scan-msg'); if (m) m.textContent = t; };
+  if (!window.Html5Qrcode) { setMsg('Scanner non disponibile (serve la connessione per caricare la libreria). Inserisci il CF a mano.'); return; }
+  try {
+    const opts = window.Html5QrcodeSupportedFormats
+      ? { formatsToSupport: [Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE] }
+      : undefined;
+    _tsScanner = new Html5Qrcode('ts-scan-area', opts);
+    _tsScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 300, height: 130 } },
+      (testo) => {
+        const dec = decodeCodiceFiscale(testo);
+        if (!dec) { setMsg('Letto "' + testo + '" — non sembra un codice fiscale, riprova.'); return; }
+        chiudiScanTessera();
+        onTrovato(dec);
+      },
+      () => {} // frame senza codice: ignora
+    ).then(() => setMsg('Fotocamera attiva: avvicina il codice a barre della tessera.'))
+     .catch(err => setMsg('Fotocamera non disponibile: ' + err));
+  } catch (e) { setMsg('Errore scanner: ' + e.message); }
+}
+function chiudiScanTessera() {
+  if (_tsScanner) { try { _tsScanner.stop().catch(() => {}); } catch (e) {} _tsScanner = null; }
+  const ov = document.getElementById('ts-modal');
+  if (ov) ov.remove();
+  document.body.style.overflow = '';
+}
+
 function validaCodiceFiscale(anagrafica) {
   const cf = (anagrafica.codiceFiscale || '').toUpperCase().trim();
   if (cf.length !== 16 || !/^[A-Z0-9]{16}$/.test(cf)) {
@@ -1489,7 +1564,6 @@ function renderSidebar() {
     nav = `
       <div class="sidebar-title">Lavoro</div>
       <div class="nav-item" data-view="board">📋 Board</div>
-      <div class="nav-item" data-view="in-attesa">⏳ In attesa</div>
 
       <div class="sidebar-title">Pazienti</div>
       <div class="nav-item" data-view="lista-pazienti">🗂 Lista</div>
@@ -3206,7 +3280,10 @@ function renderRegistrazione2(container, cfg) {
 
           <!-- 01 Dati paziente -->
           <div class="reg2-card">
-            <div class="reg2-cardhead"><span class="reg2-num">01</span><span class="reg2-cardtitle">Dati paziente</span></div>
+            <div class="reg2-cardhead">
+              <span class="reg2-num">01</span><span class="reg2-cardtitle">Dati paziente</span>
+              <button type="button" id="reg2-scan-ts" class="reg2-scan">📷 Tessera sanitaria</button>
+            </div>
             <div class="reg2-grid">${campiDati.map(c => field(c)).join('')}</div>
             <div class="reg2-sesso">
               <span>Sesso</span>
@@ -3278,6 +3355,18 @@ function renderRegistrazione2(container, cfg) {
     container.querySelector('#reg2-apri-consenso').addEventListener('click', () => {
       apriModaleConsenso(() => { container.querySelector('#reg2-consent-check').checked = true; });
     });
+
+    // Scansione tessera sanitaria → compila CF, data di nascita e sesso
+    const scanBtn = container.querySelector('#reg2-scan-ts');
+    if (scanBtn) scanBtn.addEventListener('click', () => apriScanTessera((dec) => {
+      const set = (f, v) => { const el = form.querySelector(`[data-field="${f}"]`); if (el) el.value = v; };
+      set('anagrafica.codiceFiscale', dec.codiceFiscale);
+      set('anagrafica.dataNascita', dec.dataNascita);
+      const rad = form.querySelector(`input[name="reg2-sesso"][value="${dec.sesso}"]`);
+      if (rad) rad.checked = true;
+      const cog = form.querySelector('[data-field="anagrafica.cognome"]');
+      if (cog) cog.focus();
+    }));
 
     // Campi testo Disturbi/Altro: visibili solo se la relativa checkbox è spuntata
     [['reg2-chk-disturbi', 'motivo.disturbi'], ['reg2-chk-altro', 'motivo.altro']].forEach(([cid, fid]) => {
