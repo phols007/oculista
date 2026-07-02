@@ -1,8 +1,9 @@
-# Configurazione deploy Netlify — sito statico, nessuna build
-# Test deploy continuo da repo privato: 2026-06-27
+# Configurazione deploy Netlify — sito statico.
+# Il comando di build timbra la versione (data + commit) nell'HTML,
+# così dall'app si vede subito se si sta guardando l'ultimo deploy.
 [build]
   publish = "."
-  command = ""
+  command = 'sed -i "s|__BUILD__|$(date -u +%d/%m/%Y) · ${COMMIT_REF:0:7}|g" gestionale-oculista.html'
 
 # Serve il gestionale direttamente sulla root (rewrite, URL pulito)
 [[redirects]]
