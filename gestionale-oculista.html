@@ -1243,9 +1243,11 @@ function apriScanTessera(onTrovato) {
         <button type="button" class="modal-x" aria-label="Chiudi" onclick="chiudiScanTessera()">×</button>
       </div>
       <div class="modal-body">
-        <p style="margin-bottom:12px;">Inquadra il <strong>codice a barre</strong> stampato sulla tessera (accanto al codice fiscale). Verranno compilati CF, data di nascita e sesso.</p>
+        <p style="margin-bottom:12px;">Inquadra il <strong>codice a barre col codice fiscale</strong>: sta sul <strong>fronte</strong> (lato bianco/verde “Ministero della Salute”), <strong>subito sotto il codice fiscale</strong> — <em>non</em> sul retro azzurro europeo. Verranno compilati CF, data di nascita e sesso.</p>
         <div id="ts-scan-area" style="width:100%; min-height:240px; background:#0b0b0c; border-radius:12px; overflow:hidden;"></div>
         <div id="ts-scan-msg" style="font-size:12.5px; color:var(--txt2); margin-top:10px;">Avvio fotocamera…</div>
+        <button type="button" id="ts-foto-btn" style="margin-top:12px; width:100%; padding:11px 14px; border:1px solid var(--bordo,#d6d4cb); border-radius:999px; background:#fff; font-size:13.5px; font-weight:500; cursor:pointer;">📸 Scatta una foto (consigliato su iPhone)</button>
+        <input type="file" id="ts-foto-input" accept="image/*" capture="environment" style="display:none;">
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -1253,6 +1255,36 @@ function apriScanTessera(onTrovato) {
   ov.addEventListener('click', e => { if (e.target === ov) chiudiScanTessera(); });
 
   const setMsg = (t) => { const m = document.getElementById('ts-scan-msg'); if (m) m.textContent = t; };
+
+  // Fallback foto: su iPhone/Safari il lettore dal vivo è debole. Scattare una
+  // foto nitida con la fotocamera nativa e decodificarla è molto più affidabile.
+  const _fmtList = () => { const F = window.Html5QrcodeSupportedFormats; return F ? [F.CODE_39, F.CODE_128, F.CODE_93, F.ITF, F.CODABAR, F.EAN_13, F.QR_CODE] : undefined; };
+  const fotoBtn = ov.querySelector('#ts-foto-btn');
+  const fotoInput = ov.querySelector('#ts-foto-input');
+  if (fotoBtn && fotoInput && window.Html5Qrcode) {
+    fotoBtn.addEventListener('click', () => fotoInput.click());
+    fotoInput.addEventListener('change', () => {
+      const file = fotoInput.files && fotoInput.files[0];
+      if (!file) return;
+      setMsg('Analisi della foto in corso…');
+      const analizza = () => {
+        const fmts = _fmtList();
+        const fileScanner = new Html5Qrcode('ts-scan-area', fmts ? { formatsToSupport: fmts } : undefined);
+        fileScanner.scanFile(file, false)
+          .then((testo) => {
+            const dec = decodeCodiceFiscale(testo);
+            if (!dec) { setMsg('Letto “' + testo + '” — non è un codice fiscale. Fotografa il barcode sul FRONTE (lato Ministero della Salute), subito sotto il CF.'); return; }
+            chiudiScanTessera();
+            onTrovato(dec);
+          })
+          .catch(() => setMsg('Nessun codice riconosciuto nella foto. Riprova più da vicino, ben a fuoco e con buona luce, inquadrando SOLO il barcode del fronte (sotto il CF).'));
+      };
+      // Ferma prima lo scanner dal vivo (async) per liberare l'area di rendering.
+      if (_tsScanner) { const s = _tsScanner; _tsScanner = null; Promise.resolve(s.stop()).catch(() => {}).then(analizza); }
+      else analizza();
+    });
+  }
+
   if (!window.Html5Qrcode) { setMsg('Scanner non disponibile (serve la connessione per caricare la libreria). Inserisci il CF a mano.'); return; }
   try {
     const F = window.Html5QrcodeSupportedFormats;
