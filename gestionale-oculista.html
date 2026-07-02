@@ -1209,10 +1209,46 @@ function logout() {
   render();
 }
 
-// ── pushEvento ────────────────────────────────────────────────────────────────
-function pushEvento(id, stato) {
+// ── Macchina a stati: transizioni consentite ─────────────────────────────────
+// Registrato → In attesa → In corso ⇄ In stop → Refertato → Consenso → Completato
+const TRANSIZIONI_VALIDE = {
+  [STATI.REGISTRATO]: [STATI.IN_ATTESA, STATI.IN_CORSO],
+  [STATI.IN_ATTESA]:  [STATI.IN_CORSO],
+  [STATI.IN_CORSO]:   [STATI.IN_STOP, STATI.REFERTATO],
+  [STATI.IN_STOP]:    [STATI.IN_CORSO, STATI.REFERTATO],
+  [STATI.REFERTATO]:  [STATI.CONSENSO],
+  [STATI.CONSENSO]:   [STATI.COMPLETATO],
+  [STATI.COMPLETATO]: []
+};
+
+// Verifica se il passaggio di stato è previsto dal flusso.
+// Ritorna { ok } oppure { ok:false, duplicato } (doppio click) o { ok:false, motivo }.
+function validaTransizione(p, nuovo) {
+  if (!p) return { ok: false, motivo: 'Paziente non trovato.' };
+  if (p.stato === nuovo) {
+    // Evento iniziale di registrazione: consentito una sola volta
+    if (nuovo === STATI.REGISTRATO && (!p.eventi || p.eventi.length === 0)) return { ok: true };
+    return { ok: false, duplicato: true };
+  }
+  if ((TRANSIZIONI_VALIDE[p.stato] || []).includes(nuovo)) return { ok: true };
+  let motivo = `Passaggio non previsto: "${p.stato}" → "${nuovo}".`;
+  if (nuovo === STATI.COMPLETATO && p.stato !== STATI.CONSENSO) {
+    motivo = `Il paziente è in stato "${p.stato}": il consenso al trattamento dati non risulta ancora firmato. Chiudere la visita salterebbe la firma.`;
+  }
+  return { ok: false, motivo };
+}
+
+// ── pushEvento (con guardia sulle transizioni) ───────────────────────────────
+function pushEvento(id, stato, opts = {}) {
   const p = db.getPaziente(id);
   if (!p) return;
+  if (!opts.force) {
+    const v = validaTransizione(p, stato);
+    if (!v.ok) {
+      if (v.duplicato) return; // doppio click / evento ripetuto: ignora in silenzio
+      if (!confirm('⚠️ ' + v.motivo + '\n\nVuoi procedere comunque?')) return;
+    }
+  }
   const ev = {
     stato,
     ts: new Date().toISOString(),
@@ -2141,12 +2177,18 @@ function completaVisita(id, onDone) {
   function conferma() {
     leggiDOM();
     if (!statoPag) { ov.querySelector('#pay-err').textContent = 'Seleziona lo stato del pagamento (Incassato o Da incassare) per chiudere la visita.'; return; }
+    // Guardia transizione PRIMA di salvare la parcella (niente pagamenti orfani)
+    const paz = db.getPaziente(id);
+    const v = validaTransizione(paz, STATI.COMPLETATO);
+    if (!v.ok && !v.duplicato) {
+      if (!confirm('⚠️ ' + v.motivo + '\n\nVuoi chiudere comunque la visita?')) return;
+    }
     const prestazioni = righe
       .map(r => ({ descrizione: (r.descrizione || '').trim(), importo: num(r.importo) }))
       .filter(r => r.descrizione || r.importo);
     const pagamento = { prestazioni, sconto: num(scontoVal), totale: totale(), stato: statoPag, ts: new Date().toISOString() };
     db.updatePaziente(id, { pagamento });
-    pushEvento(id, STATI.COMPLETATO);
+    if (!v.duplicato) pushEvento(id, STATI.COMPLETATO, { force: true });
     chiudi();
     if (typeof onDone === 'function') onDone();
   }
@@ -2599,7 +2641,9 @@ function renderBoard(container, filtroSoloAttesa) {
       destra = `<span class="bd2-info">${info}</span>`;
       quick = p.stato === STATI.COMPLETATO
         ? `<button class="bd2-quick" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>`
-        : `<button class="bd2-quick" onclick="event.stopPropagation(); completaVisita('${p.id}', ()=>showView('board'))">Completa</button>`;
+        : p.stato === STATI.REFERTATO
+          ? `<button class="bd2-quick" onclick="event.stopPropagation(); apriFirmaConsensoMedico('${p.id}')">✍️ Firma</button>`
+          : `<button class="bd2-quick" onclick="event.stopPropagation(); completaVisita('${p.id}', ()=>showView('board'))">Completa</button>`;
     }
 
     return `
