@@ -812,6 +812,7 @@
           <div><b>Medico:</b> rossi · bianchi</div>
           <div><b>Accettazione:</b> reg-rossi · reg-bianchi</div>
           <div><b>Firma iPad:</b> firma-rossi · firma-bianchi</div>
+          <div id="login-build" style="margin-top:6px; color:#bdbbb2;"></div>
         </div>
       </form>
     </main>
@@ -992,6 +993,12 @@
 
 <script>
 // ── Costanti ──────────────────────────────────────────────────────────────────
+// Timbro di build: il comando di build Netlify sostituisce il placeholder
+// con data e commit ad ogni deploy (vedi netlify.toml).
+const APP_BUILD = '__BUILD__';
+const APP_BUILD_LABEL = APP_BUILD.charAt(0) === '_' ? 'dev' : APP_BUILD;
+console.log('Gestionale Oculistico — versione:', APP_BUILD_LABEL);
+
 const LS_KEY = 'oculista_pazienti';
 const SS_KEY = 'oculista_user';
 
@@ -1625,6 +1632,7 @@ function renderSidebar() {
         <div style="overflow:hidden;">
           <div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${sess.nome}</div>
           <div style="font-size:0.75rem;color:var(--txt2);">${sess.ruolo === 'medico' ? 'Medico' : (sess.ruolo === 'firma' ? 'Postazione firma' : (sess.ruolo === 'registrazione' ? 'Accettazione' : 'Paziente'))}${sess.ruolo === 'medico' && _mostraDaIncassare ? ' <span title="Da incassare visibili" style="color:var(--ambra-txt);">•</span>' : ''}</div>
+          <div style="font-size:0.6rem;font-family:'Geist Mono',monospace;color:var(--txt3);margin-top:1px;">${APP_BUILD_LABEL}</div>
         </div>
       </div>
       <button class="sidebar-logout-btn" onclick="logout()" title="Esci">⇥</button>
@@ -4812,6 +4820,8 @@ function stampaQR(medicoKey) {
 seedDemoData();
 render();
 syncInit(); // sincronizzazione con il server condiviso (no-op se offline)
+const _lb = document.getElementById('login-build');
+if (_lb) _lb.textContent = 'Versione ' + APP_BUILD_LABEL;
 </script>
 </body>
 </html>
