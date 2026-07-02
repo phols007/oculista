@@ -1,0 +1,8 @@
+{
+  "name": "gestionale-oculistico",
+  "private": true,
+  "description": "Gestionale oculistico — sito statico + Netlify Functions per la sincronizzazione pazienti",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
