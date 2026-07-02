@@ -4,6 +4,9 @@
 [build]
   publish = "."
   command = 'sed -i "s|__BUILD__|$(date -u +%d/%m/%Y) · ${COMMIT_REF:0:7}|g" gestionale-oculista.html'
+  # Risparmio crediti: costruisci solo la produzione, salta i deploy preview
+  # delle PR (exit 0 = salta il build).
+  ignore = 'test "$CONTEXT" = "deploy-preview"'
 
 # Serve il gestionale direttamente sulla root (rewrite, URL pulito)
 [[redirects]]
