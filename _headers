@@ -1,0 +1,6 @@
+# L'app è un singolo HTML: mai servirlo dalla cache del browser.
+# Formato valido sia per Cloudflare Pages sia per Netlify.
+/*.html
+  Cache-Control: no-cache, must-revalidate
+/
+  Cache-Control: no-cache, must-revalidate
