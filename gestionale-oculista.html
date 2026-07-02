@@ -1206,8 +1206,13 @@ function nomeCompleto(p) {
 // ── validaCodiceFiscale ───────────────────────────────────────────────────────
 // ── Decodifica Codice Fiscale → data di nascita e sesso (con omocodia) ───────
 function decodeCodiceFiscale(cfRaw) {
-  const cf = (cfRaw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (!/^[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z0-9]{4}[A-Z]$/.test(cf)) return null;
+  const raw = (cfRaw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Cerca un CF valido ANCHE dentro una stringa più lunga: i lettori possono
+  // restituire il carattere di checksum del Code 39 o dati extra della tessera.
+  const RE = /[A-Z]{6}[0-9LMNPQRSTUV]{2}[ABCDEHLMPRST][0-9LMNPQRSTUV]{2}[A-Z0-9]{4}[A-Z]/;
+  const m = raw.match(RE);
+  const cf = m ? m[0] : null;
+  if (!cf) return null;
   const OMO = { L: '0', M: '1', N: '2', P: '3', Q: '4', R: '5', S: '6', T: '7', U: '8', V: '9' };
   const dig = c => /[0-9]/.test(c) ? c : (OMO[c] || '');
   const MESI = { A: '01', B: '02', C: '03', D: '04', E: '05', H: '06', L: '07', M: '08', P: '09', R: '10', S: '11', T: '12' };
@@ -1250,22 +1255,30 @@ function apriScanTessera(onTrovato) {
   const setMsg = (t) => { const m = document.getElementById('ts-scan-msg'); if (m) m.textContent = t; };
   if (!window.Html5Qrcode) { setMsg('Scanner non disponibile (serve la connessione per caricare la libreria). Inserisci il CF a mano.'); return; }
   try {
-    const opts = window.Html5QrcodeSupportedFormats
-      ? { formatsToSupport: [Html5QrcodeSupportedFormats.CODE_39, Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.QR_CODE] }
-      : undefined;
+    const F = window.Html5QrcodeSupportedFormats;
+    const opts = {
+      // BarcodeDetector nativo del browser: molto più affidabile sui codici a
+      // barre lineari (Code 39) rispetto al lettore ZXing di fallback.
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      verbose: false
+    };
+    if (F) opts.formatsToSupport = [F.CODE_39, F.CODE_128, F.CODE_93, F.ITF, F.CODABAR, F.EAN_13, F.QR_CODE];
     _tsScanner = new Html5Qrcode('ts-scan-area', opts);
+    // Riquadro largo come un codice a barre + autofocus continuo.
+    const qrbox = (vw) => { const w = Math.floor(Math.min(vw || 320, 480) * 0.92); return { width: w, height: Math.max(90, Math.floor(w * 0.42)) }; };
+    const camera = { facingMode: { ideal: 'environment' }, advanced: [{ focusMode: 'continuous' }] };
     _tsScanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 300, height: 130 } },
+      camera,
+      { fps: 15, qrbox, aspectRatio: 1.7777 },
       (testo) => {
         const dec = decodeCodiceFiscale(testo);
-        if (!dec) { setMsg('Letto "' + testo + '" — non sembra un codice fiscale, riprova.'); return; }
+        if (!dec) { setMsg('Letto “' + testo + '” — non è un codice fiscale. Inquadra il barcode SOTTO il codice fiscale, sul fronte della tessera.'); return; }
         chiudiScanTessera();
         onTrovato(dec);
       },
       () => {} // frame senza codice: ignora
-    ).then(() => setMsg('Fotocamera attiva: avvicina il codice a barre della tessera.'))
-     .catch(err => setMsg('Fotocamera non disponibile: ' + err));
+    ).then(() => setMsg('Fotocamera attiva: avvicina bene il codice a barre (quello sul fronte, sotto il CF) e tienilo fermo.'))
+     .catch(err => setMsg('Fotocamera non disponibile: ' + (err && err.message ? err.message : err)));
   } catch (e) { setMsg('Errore scanner: ' + e.message); }
 }
 function chiudiScanTessera() {
