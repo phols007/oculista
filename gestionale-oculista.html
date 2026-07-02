@@ -1039,6 +1039,7 @@ const db = {
     p.updatedAt = new Date().toISOString();
     arr.push(p);
     this._save(arr);
+    syncPush(p); // condivide col server (fire-and-forget, con coda offline)
     return p;
   },
   updatePaziente(id, patch) {
@@ -1051,12 +1052,85 @@ const db = {
     }
     arr[i] = { ...cur, ...patch, updatedAt: new Date().toISOString() };
     this._save(arr);
+    syncPush(arr[i]);
     return arr[i];
   },
   removeAll() {
     localStorage.removeItem(LS_KEY);
   }
 };
+
+// ── Sync remoto (Netlify Functions + Blobs) ──────────────────────────────────
+// L'app resta locale-first: legge/scrive sempre localStorage. In più, ogni
+// salvataggio viene spinto a /api/pazienti e ogni SYNC_POLL_MS si scaricano
+// gli aggiornamenti degli altri dispositivi (es. registrazione dal telefono
+// del paziente → board del medico). Se l'API non c'è (uso offline/locale),
+// tutto continua a funzionare come prima.
+const SYNC_URL = '/api/pazienti';
+const SYNC_POLL_MS = 45000;
+const LS_PENDING = 'oculista_sync_pending';
+let _syncLastPull = null; // ISO dell'ultimo pull riuscito → i successivi sono delta
+
+function _pendingGet() { try { return JSON.parse(localStorage.getItem(LS_PENDING)) || []; } catch { return []; } }
+function _pendingAdd(id) { const q = _pendingGet(); if (!q.includes(id)) { q.push(id); localStorage.setItem(LS_PENDING, JSON.stringify(q)); } }
+function _pendingClear(ids) { localStorage.setItem(LS_PENDING, JSON.stringify(_pendingGet().filter(x => !ids.includes(x)))); }
+
+function syncPush(p) {
+  if (!p || !p.id) return;
+  fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
+    .then(r => { if (!r.ok) throw new Error(r.status); })
+    .catch(() => _pendingAdd(p.id)); // offline o API assente: riprova al prossimo ciclo
+}
+
+// Fonde i pazienti remoti nel locale: vince l'updatedAt più recente.
+function _mergeRemote(remoti) {
+  if (!Array.isArray(remoti) || remoti.length === 0) return false;
+  const byId = new Map(db.getPazienti().map(p => [p.id, p]));
+  let cambiato = false;
+  for (const r of remoti) {
+    if (!r || !r.id) continue;
+    const l = byId.get(r.id);
+    if (!l || Date.parse(r.updatedAt || 0) > Date.parse(l.updatedAt || 0)) {
+      byId.set(r.id, r);
+      cambiato = true;
+    }
+  }
+  if (cambiato) db._save([...byId.values()]);
+  return cambiato;
+}
+
+async function syncPull() {
+  try {
+    const url = _syncLastPull ? SYNC_URL + '?since=' + encodeURIComponent(_syncLastPull) : SYNC_URL;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(r.status);
+    const dati = await r.json();
+    _syncLastPull = new Date().toISOString();
+    if (_mergeRemote(dati) && typeof refreshVistaCorrente === 'function') refreshVistaCorrente();
+  } catch { /* API non raggiungibile: si resta in locale */ }
+}
+
+async function _syncFlushPending() {
+  const ids = _pendingGet();
+  if (!ids.length) return;
+  const inviati = [];
+  for (const id of ids) {
+    const p = db.getPaziente(id);
+    if (!p) { inviati.push(id); continue; }
+    try {
+      const r = await fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) });
+      if (r.ok) inviati.push(id); else break;
+    } catch { break; }
+  }
+  if (inviati.length) _pendingClear(inviati);
+}
+
+function syncInit() {
+  _syncFlushPending();
+  syncPull();
+  setInterval(() => { if (!document.hidden) { _syncFlushPending(); syncPull(); } }, SYNC_POLL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncPull(); });
+}
 
 // ── Factory schema paziente ───────────────────────────────────────────────────
 function nuovoPaziente() {
@@ -4356,11 +4430,18 @@ function seedDemoData() {
   localStorage.setItem('oculista_seed', SEED_VERSION);
 }
 
-function resetDemo() {
-  if (!confirm('Ripristinare i dati demo? Tutti i dati attuali verranno cancellati.')) return;
+async function resetDemo() {
+  if (!confirm('Ripristinare i dati demo? Tutti i dati attuali verranno cancellati (anche sul server condiviso).')) return;
   localStorage.removeItem('oculista_seed');
+  localStorage.removeItem(LS_PENDING);
   db.removeAll();
   seedDemoData();
+  // Riallinea il server condiviso ai dati demo (se l'API è raggiungibile)
+  try {
+    await fetch(SYNC_URL + '?id=*', { method: 'DELETE' });
+    await fetch(SYNC_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(db.getPazienti()) });
+    _syncLastPull = new Date().toISOString();
+  } catch { /* offline: demo solo locale */ }
   showView('board');
 }
 
@@ -4443,6 +4524,7 @@ function stampaQR(medicoKey) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 seedDemoData();
 render();
+syncInit(); // sincronizzazione con il server condiviso (no-op se offline)
 </script>
 </body>
 </html>
