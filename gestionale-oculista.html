@@ -1231,6 +1231,31 @@ function decodeCodiceFiscale(cfRaw) {
 
 // ── Scanner tessera sanitaria (barcode Code 39 col CF) ───────────────────────
 let _tsScanner = null;
+
+// Carica Tesseract.js (OCR) su richiesta, solo quando serve leggere il CF scritto.
+function _ensureOCR() {
+  return new Promise((res, rej) => {
+    if (window.Tesseract) return res(window.Tesseract);
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    s.onload = () => window.Tesseract ? res(window.Tesseract) : rej(new Error('OCR non disponibile'));
+    s.onerror = () => rej(new Error('OCR non caricato (serve connessione)'));
+    document.head.appendChild(s);
+  });
+}
+// Legge il codice fiscale STAMPATO su una foto della tessera (funziona con
+// qualsiasi tessera: il CF è sempre scritto in chiaro, anche quando il barcode
+// contiene solo il numero della tessera).
+async function _ocrCodiceFiscaleDaFoto(file) {
+  const T = await _ensureOCR();
+  const worker = await T.createWorker('eng');
+  try {
+    await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' });
+    const { data } = await worker.recognize(file);
+    return (data && data.text) ? data.text : '';
+  } finally { try { await worker.terminate(); } catch (e) {} }
+}
+
 function apriScanTessera(onTrovato) {
   chiudiScanTessera();
   const ov = document.createElement('div');
@@ -1243,10 +1268,10 @@ function apriScanTessera(onTrovato) {
         <button type="button" class="modal-x" aria-label="Chiudi" onclick="chiudiScanTessera()">×</button>
       </div>
       <div class="modal-body">
-        <p style="margin-bottom:12px;">Inquadra il <strong>codice a barre col codice fiscale</strong>: sta sul <strong>fronte</strong> (lato bianco/verde “Ministero della Salute”), <strong>subito sotto il codice fiscale</strong> — <em>non</em> sul retro azzurro europeo. Verranno compilati CF, data di nascita e sesso.</p>
+        <p style="margin-bottom:12px;">Inquadra il <strong>codice fiscale</strong> della tessera — va bene il <strong>codice a barre</strong> oppure il <strong>CF scritto</strong> (16 caratteri). Verranno compilati CF, data di nascita e sesso.</p>
         <div id="ts-scan-area" style="width:100%; min-height:240px; background:#0b0b0c; border-radius:12px; overflow:hidden;"></div>
         <div id="ts-scan-msg" style="font-size:12.5px; color:var(--txt2); margin-top:10px;">Avvio fotocamera…</div>
-        <button type="button" id="ts-foto-btn" style="margin-top:12px; width:100%; padding:11px 14px; border:1px solid var(--bordo,#d6d4cb); border-radius:999px; background:#fff; font-size:13.5px; font-weight:500; cursor:pointer;">📸 Scatta una foto (consigliato su iPhone)</button>
+        <button type="button" id="ts-foto-btn" style="margin-top:12px; width:100%; padding:11px 14px; border:1px solid var(--bordo,#d6d4cb); border-radius:999px; background:#fff; font-size:13.5px; font-weight:500; cursor:pointer;">📸 Scatta una foto — legge anche il CF scritto (iPhone)</button>
         <input type="file" id="ts-foto-input" accept="image/*" capture="environment" style="display:none;">
       </div>
     </div>`;
@@ -1267,17 +1292,30 @@ function apriScanTessera(onTrovato) {
       const file = fotoInput.files && fotoInput.files[0];
       if (!file) return;
       setMsg('Analisi della foto in corso…');
+      const trovato = (dec) => { chiudiScanTessera(); onTrovato(dec); };
+      // 2° tentativo: leggi il CF SCRITTO sulla tessera con l'OCR (funziona anche
+      // quando il barcode contiene solo il numero della tessera).
+      const provaOCR = () => {
+        setMsg('Leggo il codice fiscale scritto sulla tessera… (qualche secondo)');
+        _ocrCodiceFiscaleDaFoto(file)
+          .then((testo) => {
+            const dec = decodeCodiceFiscale(testo);
+            if (dec) { trovato(dec); return; }
+            setMsg('Non sono riuscito a leggere il codice fiscale dalla foto. Riprova inquadrando bene il CF (16 caratteri) o la sua barra, ben a fuoco. In alternativa scrivilo a mano.');
+          })
+          .catch(() => setMsg('OCR non disponibile ora. Scrivi il codice fiscale a mano: data di nascita e sesso si compilano da soli.'));
+      };
+      // 1° tentativo: barcode dalla foto.
       const analizza = () => {
         const fmts = _fmtList();
         const fileScanner = new Html5Qrcode('ts-scan-area', fmts ? { formatsToSupport: fmts } : undefined);
         fileScanner.scanFile(file, false)
           .then((testo) => {
             const dec = decodeCodiceFiscale(testo);
-            if (!dec) { setMsg('Letto “' + testo + '” — non è un codice fiscale. Fotografa il barcode sul FRONTE (lato Ministero della Salute), subito sotto il CF.'); return; }
-            chiudiScanTessera();
-            onTrovato(dec);
+            if (dec) { trovato(dec); return; }
+            provaOCR(); // barcode letto ma non è un CF (es. numero tessera) → OCR
           })
-          .catch(() => setMsg('Nessun codice riconosciuto nella foto. Riprova più da vicino, ben a fuoco e con buona luce, inquadrando SOLO il barcode del fronte (sotto il CF).'));
+          .catch(() => provaOCR()); // nessun barcode leggibile → OCR
       };
       // Ferma prima lo scanner dal vivo (async) per liberare l'area di rendering.
       if (_tsScanner) { const s = _tsScanner; _tsScanner = null; Promise.resolve(s.stop()).catch(() => {}).then(analizza); }
