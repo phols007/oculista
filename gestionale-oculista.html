@@ -8,29 +8,41 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ── Token CSS "Demo Laboratorio" ── */
+    /* ── Token CSS "Studio Medico" (crema/serif, come login e registrazione) ── */
     :root {
-      --card:    #f5f5f7;
-      --txt:     #1d1d1f;
-      --txt2:    #6e6e73;
+      --card:    #ffffff;
+      --txt:     #16150f;
+      --txt2:    #54534b;
+      --txt3:    #8a897f;
       --ambra:   #fde68a;
       --ambra-txt:#92651a;
       --verde:   #34c759;
-      --rosso:   #ff3b30;
-      --bordo:   #d2d2d7;
-      --r:       14px;
+      --rosso:   #b23a2f;
+      --bordo:   #e2e0d8;
+      --bordo2:  #d6d4cb;
+      --r:       16px;
       --blu:     #0071e3;
       --viola:   #8b5cf6;
       --verde-pieno: #1a8a3c;
+      --sfondo:  #f4f3f0;
+      --inchiostro: #16150f;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
       color: var(--txt);
-      background: #fff;
+      background: var(--sfondo);
       min-height: 100vh;
+    }
+
+    /* Titoli di pagina in serif, come "Bentornato." e "Nuova registrazione" */
+    #main h2, #main h1, .bd2-title {
+      font-family: 'Instrument Serif', serif !important;
+      font-weight: 400 !important;
+      letter-spacing: -.01em !important;
     }
 
     /* ── Shell layout — sidebar "a tendina" (drawer) a tutte le larghezze ── */
@@ -146,11 +158,12 @@
       .hm-hero { grid-template-columns: 1fr; gap: 30px; padding: 8px 24px 40px; }
     }
 
-    /* ── Card ── */
+    /* ── Card (bianche con bordo, come le sezioni della registrazione) ── */
     .card {
       background: var(--card);
+      border: 1px solid var(--bordo);
       border-radius: var(--r);
-      padding: 20px;
+      padding: 22px;
     }
 
     /* ── Modale (popup consenso) ── */
@@ -263,26 +276,28 @@
     .badge.viola       { background: var(--viola);       color: #fff;             border-color: transparent; }
     .badge.verde-pieno { background: var(--verde-pieno); color: #fff;             border-color: transparent; }
 
-    /* ── Bottoni ── */
+    /* ── Bottoni (stile Studio Medico: pillole, primario nero inchiostro) ── */
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 0 16px;
+      padding: 0 18px;
       min-height: 44px;
-      border-radius: 10px;
-      border: 1px solid var(--bordo);
+      border-radius: 999px;
+      border: 1px solid var(--bordo2);
       background: #fff;
       color: var(--txt);
       font-size: 0.9rem;
+      font-weight: 500;
       font-family: inherit;
       cursor: pointer;
-      transition: opacity .15s;
+      transition: opacity .15s, background .15s;
     }
-    .btn:hover  { opacity: .75; }
+    .btn:hover  { opacity: .8; }
     .btn-danger { background: var(--rosso); color: #fff; border-color: transparent; }
-    .btn-primary { background: var(--txt); color: #fff; border-color: transparent; }
+    .btn-primary { background: var(--inchiostro); color: #f4f3f0; border-color: transparent; }
+    .btn-primary:hover { background: #000; opacity: 1; }
 
     /* ── Timeline ── */
     /* ── Timeline (stile reference) ── */
@@ -340,8 +355,8 @@
     .sidebar-avatar {
       width: 36px; height: 36px;
       border-radius: 50%;
-      background: var(--verde);
-      color: #fff;
+      background: var(--inchiostro);
+      color: #f4f3f0;
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 0.9rem;
       flex-shrink: 0;
@@ -379,16 +394,17 @@
       color: var(--txt);
       transition: background .15s;
     }
-    .nav-item:hover  { background: rgba(0,0,0,.05); }
-    .nav-item.active { background: rgba(52,199,89,.12); color: var(--verde-pieno); font-weight: 600; }
+    .nav-item:hover  { background: rgba(20,18,12,.05); }
+    .nav-item.active { background: rgba(20,18,12,.08); color: var(--inchiostro); font-weight: 600; }
 
     .sidebar-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: .08em;
+      font-family: 'Geist Mono', monospace;
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: .16em;
       text-transform: uppercase;
-      color: var(--txt2);
-      padding: 8px 12px 4px;
+      color: var(--txt3);
+      padding: 10px 12px 4px;
     }
 
     /* ── Sidebar footer (nome utente + Esci) ── */
@@ -457,7 +473,7 @@
       padding-bottom: 16px; margin-bottom: 18px;
       border-bottom: 1px solid var(--bordo);
     }
-    .bd2-title { font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; }
+    .bd2-title { font-size: 1.7rem; font-weight: 700; letter-spacing: -.01em; }
     .bd2-counts { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
     .bd2-counts span { font-size: 0.86rem; color: var(--txt2); white-space: nowrap; }
     .bd2-counts b { font-size: 1.05rem; font-weight: 700; color: var(--txt); margin-right: 4px; font-variant-numeric: tabular-nums; }
@@ -636,7 +652,7 @@
       position: fixed;
       top: 0; left: 0; right: 0;
       height: 56px;
-      background: #fff;
+      background: #faf9f6;
       border-bottom: 1px solid var(--bordo);
       z-index: 90;
       align-items: center;
@@ -658,8 +674,11 @@
     #mobile-topbar-title {
       flex: 1;
       text-align: center;
-      font-weight: 700;
-      font-size: 1rem;
+      font-family: 'Geist Mono', monospace;
+      font-weight: 500;
+      font-size: 0.8rem;
+      letter-spacing: .16em;
+      text-transform: uppercase;
       color: var(--txt);
     }
     #mobile-topbar-right {
@@ -1348,7 +1367,10 @@ function renderSidebar() {
 
   const header = `
     <div class="sidebar-header">
-      <div style="font-size:1rem; font-weight:700; color:var(--txt);">👁 Oculistica</div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span style="font-family:'Geist Mono',monospace; font-size:0.72rem; letter-spacing:.18em; text-transform:uppercase; font-weight:500; color:var(--txt);">Studio Medico</span>
+      </div>
       <button class="sidebar-close-btn" onclick="chiudiSidebar()" aria-label="Chiudi menu">×</button>
     </div>`;
 
@@ -1491,7 +1513,10 @@ function renderSidebarKiosk() {
   const nomeMed = UTENTI[_kioscoMedico] ? UTENTI[_kioscoMedico].nome : _kioscoMedico;
   sidebar.innerHTML = `
     <div class="sidebar-header">
-      <div style="font-size:1rem;font-weight:700;color:var(--txt);">👁 Oculistica</div>
+      <div style="display:flex; align-items:center; gap:9px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span style="font-family:'Geist Mono',monospace; font-size:0.72rem; letter-spacing:.18em; text-transform:uppercase; font-weight:500; color:var(--txt);">Studio Medico</span>
+      </div>
     </div>
     <div style="padding:12px 8px;border-radius:10px;background:var(--card);margin-top:8px;">
       <div style="font-size:0.75rem;color:var(--txt2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">Medico</div>
@@ -2332,10 +2357,11 @@ function renderDettaglio(container, id) {
   container.innerHTML = `
     <div style="max-width:760px;">
       <!-- Header -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
-        <h1 style="font-size:1.5rem;font-weight:700;">#${id}</h1>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+        <h1 style="font-size:1.9rem;">${escapeHtml(nome)}</h1>
         ${badgeStato(stato)}
         ${isInStop ? `<span style="font-size:0.85rem;color:var(--txt2);">In pausa da <span class="crono" data-stop-since="${inizioStop(p)}"></span></span>` : ''}
+        <span style="font-family:'Geist Mono',monospace;font-size:0.68rem;color:var(--txt3);margin-left:auto;">#${id}</span>
       </div>
       <div style="font-size:0.82rem;color:var(--txt2);margin-bottom:24px;">
         <span style="cursor:pointer;" id="det-bread-home">Home</span>
