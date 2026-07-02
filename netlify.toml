@@ -9,3 +9,15 @@
   from = "/"
   to = "/gestionale-oculista.html"
   status = 200
+
+# L'app è un singolo HTML: mai servirlo dalla cache del browser,
+# così ogni ricarica prende sempre l'ultima versione pubblicata.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"
