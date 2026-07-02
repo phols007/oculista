@@ -2,10 +2,17 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="refresh" content="0; url=gestionale-oculista.html">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gestionale Oculistico</title>
+  <script>
+    // GitHub Pages non applica header no-cache: per non far mai vedere una
+    // versione vecchia, apriamo l'app con un parametro univoco a ogni accesso.
+    // Cosi' il browser e la CDN sono costretti a caricare l'ultima versione.
+    location.replace('gestionale-oculista.html?t=' + Date.now());
+  </script>
+  <noscript><meta http-equiv="refresh" content="0; url=gestionale-oculista.html"></noscript>
 </head>
 <body>
-  <p>Reindirizzamento a <a href="gestionale-oculista.html">Gestionale Oculistico</a>…</p>
+  <p>Apertura del <a href="gestionale-oculista.html">Gestionale Oculistico</a>…</p>
 </body>
 </html>
