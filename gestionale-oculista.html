@@ -2291,14 +2291,11 @@ function leggiAnagraficaDalForm(container) {
 }
 
 // ── Board: badge colore per stato ────────────────────────────────────────────
+// Badge stato: icona a linea + etichetta colorata, coerente con le liste.
 function badgeStato(stato) {
-  const cls = stato === STATI.IN_CORSO    ? 'verde'
-             : stato === STATI.IN_STOP    ? 'ambra'
-             : stato === STATI.REFERTATO  ? 'blu'
-             : stato === STATI.CONSENSO   ? 'viola'
-             : stato === STATI.COMPLETATO ? 'verde-pieno'
-             : '';          // Registrato / In attesa → grigio default
-  return `<span class="badge ${cls}">${stato}</span>`;
+  const d = (typeof SVG_STATO !== 'undefined' && SVG_STATO[stato]) ? SVG_STATO[stato] : null;
+  const col = d ? d.c : 'var(--txt2)';
+  return `<span style="display:inline-flex; align-items:center; gap:5px; color:${col}; font-weight:600; font-size:0.8rem; white-space:nowrap;">${iconaStato(stato)}<span>${stato}</span></span>`;
 }
 
 // ── Icone minimali coerenti (SVG line, stessa griglia 24×24, stesso tratto) ────
