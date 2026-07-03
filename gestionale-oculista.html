@@ -4301,14 +4301,24 @@ function renderRicerca(container) {
       if (pg.stato === 'incassato') { inc += pg.totale || 0; nInc++; }
       else if (pg.stato === 'da_incassare') { att += pg.totale || 0; nAtt++; }
     });
-    const extra = (_mostraDaIncassare && nAtt)
-      ? `<span style="margin-left:16px; color:var(--ambra-txt);">Da incassare: <strong>€ ${fmtEuro(att)}</strong> <span style="opacity:.8;">(${nAtt})</span></span>` : '';
+    // Col tasto nascosto attivo si mostra anche il da-incassare e il totale
+    // complessivo (incassato + da incassare) del periodo.
+    const mostraAtt = _mostraDaIncassare && nAtt;
+    const rigaComplessivo = mostraAtt ? `
+        <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid var(--bordo);">
+          <span style="color:var(--ambra-txt); font-size:0.9rem;">Da incassare: <strong>€ ${fmtEuro(att)}</strong> <span style="opacity:.8;">(${nAtt})</span></span>
+          <span style="margin-left:auto; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale complessivo</span>
+          <strong style="font-size:1.25rem; color:var(--inchiostro);">€ ${fmtEuro(inc + att)}</strong>
+          <span style="font-size:0.8rem; color:var(--txt2);">${nInc + nAtt} ${(nInc + nAtt) === 1 ? 'visita' : 'visite'}</span>
+        </div>` : '';
     return `
-      <div class="ricerca-totale" style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 16px; background:var(--card); border:1px solid var(--bordo); border-radius:12px; margin:12px 0;">
-        <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale incassato · ${descrizionePeriodo()}</span>
-        <strong style="font-size:1.5rem; color:var(--inchiostro);">€ ${fmtEuro(inc)}</strong>
-        <span style="font-size:0.85rem; color:var(--txt2);">${nInc} ${nInc === 1 ? 'visita' : 'visite'}${prest ? ' · ' + escapeHtml(prest) : ''}</span>
-        ${extra}
+      <div class="ricerca-totale" style="padding:14px 16px; background:var(--card); border:1px solid var(--bordo); border-radius:12px; margin:12px 0;">
+        <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale incassato · ${descrizionePeriodo()}</span>
+          <strong style="font-size:1.5rem; color:var(--inchiostro);">€ ${fmtEuro(inc)}</strong>
+          <span style="font-size:0.85rem; color:var(--txt2);">${nInc} ${nInc === 1 ? 'visita' : 'visite'}${prest ? ' · ' + escapeHtml(prest) : ''}</span>
+        </div>
+        ${rigaComplessivo}
       </div>`;
   }
 
@@ -4381,11 +4391,16 @@ function renderRicerca(container) {
     const { p, label, valore } = item;
     const nome = nomeCompleto(p) || '(senza nome)';
     const med = mostraMedico ? `<span style="font-size:0.8rem;color:var(--txt2);">${nomeMedico(p.medicoAssegnato)}</span>` : '';
+    // Contrassegno visite ancora da incassare (visibili solo col tasto nascosto).
+    const daInc = (p.pagamento && p.pagamento.stato === 'da_incassare');
+    const pillDaInc = daInc
+      ? `<span style="font-size:0.7rem; color:var(--ambra-txt); background:var(--ambra); padding:2px 9px; border-radius:999px; white-space:nowrap; font-weight:600;">● Da incassare € ${fmtEuro(p.pagamento.totale || 0)}</span>` : '';
     return `
-      <div class="ricerca-result" data-id="${p.id}" title="Apri dettaglio">
+      <div class="ricerca-result" data-id="${p.id}" title="Apri dettaglio"${daInc ? ' style="border-left:3px solid var(--ambra-txt);"' : ''}>
         <div class="ricerca-result-head">
           <span class="ricerca-result-nome">${evidenzia(nome, q)}</span>
           ${med}
+          ${pillDaInc}
           ${badgeStato(p.stato)}
         </div>
         <div class="ricerca-snippet"><strong>${label}:</strong> ${snippet(valore, q)}</div>
