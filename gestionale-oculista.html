@@ -2328,6 +2328,23 @@ function iconaPagamento(p) {
   return _icoSvg(inner, color, title);
 }
 
+// Libreria di icone azione/interfaccia (stesso stile a linea, ereditano il colore).
+const ICO = {
+  play:     '<path d="M8 6l10 6-10 6z"/>',
+  pause:    '<path d="M9.6 7v10M14.4 7v10"/>',
+  clock:    '<circle cx="12" cy="12" r="8.2"/><path d="M12 8v4.2l3 1.8"/>',
+  file:     '<path d="M14 3.5H7.6A1.8 1.8 0 0 0 5.8 5.3v13.4A1.8 1.8 0 0 0 7.6 20.5h8.8a1.8 1.8 0 0 0 1.8-1.8V8z"/><path d="M14 3.5V8h4.2"/>',
+  filePen:  '<path d="M14 3.5H7.6A1.8 1.8 0 0 0 5.8 5.3v13.4A1.8 1.8 0 0 0 7.6 20.5h8.8a1.8 1.8 0 0 0 1.8-1.8V8z"/><path d="M14 3.5V8h4.2"/><path d="M9 15.5l4-4 1.6 1.6-4 4H9z"/>',
+  pen:      '<path d="M12 20h9"/><path d="M16.5 3.5a2 2 0 0 1 2.9 2.9L7.5 18.3 3.5 19.5l1.2-4z"/>',
+  check:    '<circle cx="12" cy="12" r="8.2"/><path d="M8.4 12.2l2.6 2.5 4.6-4.8"/>',
+  download: '<path d="M12 4v11"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/>',
+  alert:    '<path d="M12 4.5 21 20H3z"/><path d="M12 10.5v4M12 17h.01"/>'
+};
+function _svgInline(inner, size) {
+  size = size || 14;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; flex:none;">${inner}</svg>`;
+}
+
 // ── setStato ──────────────────────────────────────────────────────────────────
 function setStato(id, stato) {
   pushEvento(id, stato);
@@ -2919,31 +2936,32 @@ function renderBoard(container, filtroSoloAttesa) {
     const since = inizioStatoCorrente(p);
     const consOk = p.consensoTrattamento && p.consensoTrattamento.accettato;
     const consIcon = consOk
-      ? `<span class="bd2-cons ok" title="Consenso GDPR accettato in registrazione">✓</span>`
-      : `<span class="bd2-cons no" title="Consenso GDPR non risulta accettato">!</span>`;
+      ? `<span class="bd2-cons ok" title="Consenso GDPR accettato in registrazione">${_svgInline(ICO.check, 15)}</span>`
+      : `<span class="bd2-cons no" title="Consenso GDPR non risulta accettato">${_svgInline(ICO.alert, 15)}</span>`;
     let destra = '', quick = '';
+    const btn = (azione, ico, testo) => `<button class="bd2-quick" onclick="event.stopPropagation(); ${azione}"><span style="display:inline-flex; align-items:center; gap:5px;">${_svgInline(ico, 13)}${testo}</span></button>`;
 
     if (tipo === 'attesa') {
       const min = minutiDa(since);
       const lvl = min > 15 ? 'urg' : min > 5 ? 'warn' : '';
       destra = `<span class="bd2-time ${lvl}" data-wait-since="${since}" data-thresh="1">${formatMin(min)}</span>`;
-      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); prendiInCarico('${p.id}')">Prendi in carico</button>`;
+      quick = btn(`prendiInCarico('${p.id}')`, ICO.play, 'Prendi in carico');
     } else if (tipo === 'corso') {
       destra = `<span class="bd2-time" data-wait-since="${since}" data-thresh="0">${formatMin(minutiDa(since))}</span>`;
-      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); apriReferto('${p.id}')">Referto</button>`;
+      quick = btn(`apriReferto('${p.id}')`, ICO.filePen, 'Referto');
     } else if (tipo === 'stop') {
       destra = `<span class="bd2-info">pausa · <span class="bd2-time" data-wait-since="${since}" data-thresh="0">${formatMin(minutiDa(since))}</span></span>`;
-      quick = `<button class="bd2-quick" onclick="event.stopPropagation(); setStato('${p.id}', '${STATI.IN_CORSO}')">Riprendi</button>`;
+      quick = btn(`setStato('${p.id}', '${STATI.IN_CORSO}')`, ICO.play, 'Riprendi');
     } else { // compl
       const info = p.stato === STATI.REFERTATO ? 'da firmare'
                  : p.stato === STATI.CONSENSO  ? 'da chiudere'
                  : 'completato';
       destra = `<span class="bd2-info">${info}</span>`;
       quick = p.stato === STATI.COMPLETATO
-        ? `<button class="bd2-quick" onclick="event.stopPropagation(); generaPDF('${p.id}')">PDF</button>`
+        ? btn(`generaPDF('${p.id}')`, ICO.download, 'PDF')
         : p.stato === STATI.REFERTATO
-          ? `<button class="bd2-quick" onclick="event.stopPropagation(); apriFirmaConsensoMedico('${p.id}')">✍️ Firma</button>`
-          : `<button class="bd2-quick" onclick="event.stopPropagation(); completaVisita('${p.id}', ()=>showView('board'))">Completa</button>`;
+          ? btn(`apriFirmaConsensoMedico('${p.id}')`, ICO.pen, 'Firma')
+          : btn(`completaVisita('${p.id}', ()=>showView('board'))`, ICO.check, 'Completa');
     }
 
     return `
@@ -2955,14 +2973,21 @@ function renderBoard(container, filtroSoloAttesa) {
       </div>`;
   }
 
+  const ICO_COL = {
+    attesa: { p: ICO.clock, c: '#9a7b2e' },
+    corso:  { p: ICO.play,  c: '#2e7d32' },
+    stop:   { p: ICO.pause, c: 'var(--ambra-txt)' },
+    compl:  { p: ICO.check, c: '#2f6fb0' }
+  };
   function colonna(titolo, lista, tipo, dotCls) {
     const righe = lista.length
       ? lista.map(p => rigaPaziente(p, tipo)).join('')
       : `<div class="bd2-empty">Nessun paziente</div>`;
+    const ic = ICO_COL[tipo] || ICO_COL.attesa;
     return `
       <div class="bd2-col">
         <div class="bd2-col-head">
-          <span class="bd2-cdot ${dotCls}"></span>
+          <span style="display:inline-flex; align-items:center; color:${ic.c};">${_svgInline(ic.p, 16)}</span>
           <span class="bd2-cname">${titolo}</span>
           <span class="bd2-cn">${lista.length}</span>
         </div>
