@@ -981,6 +981,9 @@
     <div id="view-qr" class="view">
       <!-- Populated by renderQR -->
     </div>
+    <div id="view-prestazioni" class="view">
+      <!-- Populated by renderPrestazioni -->
+    </div>
   </div>
 </div>
 
@@ -988,8 +991,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- QRCode.js CDN -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<!-- html5-qrcode CDN (scansione codice a barre tessera sanitaria) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<!-- Quagga2 CDN (scansione dal vivo del codice a barre della tessera) -->
+<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 
 <script>
 // ── Costanti ──────────────────────────────────────────────────────────────────
@@ -1258,6 +1261,7 @@ async function _ocrCodiceFiscaleDaFoto(file, onProgress) {
   } finally { try { await worker.terminate(); } catch (e) {} }
 }
 
+let _tsQuagga = false;
 function apriScanTessera(onTrovato) {
   chiudiScanTessera();
   const ov = document.createElement('div');
@@ -1270,11 +1274,10 @@ function apriScanTessera(onTrovato) {
         <button type="button" class="modal-x" aria-label="Chiudi" onclick="chiudiScanTessera()">×</button>
       </div>
       <div class="modal-body">
-        <p style="margin-bottom:12px;">Inquadra il <strong>codice fiscale</strong> della tessera — va bene il <strong>codice a barre</strong> oppure il <strong>CF scritto</strong> (16 caratteri). Verranno compilati CF, data di nascita e sesso.</p>
-        <div id="ts-scan-area" style="width:100%; min-height:240px; background:#0b0b0c; border-radius:12px; overflow:hidden;"></div>
+        <p style="margin-bottom:12px;">Inquadra il <strong>codice a barre col codice fiscale</strong> (sul fronte, sotto il CF), da vicino e ben a fuoco. Verranno compilati CF, data di nascita e sesso.</p>
+        <div id="ts-scan-area" style="position:relative; width:100%; min-height:240px; background:#0b0b0c; border-radius:12px; overflow:hidden;"></div>
         <div id="ts-scan-msg" style="font-size:12.5px; color:var(--txt2); margin-top:10px;">Avvio fotocamera…</div>
-        <button type="button" id="ts-foto-btn" style="margin-top:12px; width:100%; padding:11px 14px; border:1px solid var(--bordo,#d6d4cb); border-radius:999px; background:#fff; font-size:13.5px; font-weight:500; cursor:pointer;">📸 Scatta una foto — legge anche il CF scritto (iPhone)</button>
-        <input type="file" id="ts-foto-input" accept="image/*" capture="environment" style="display:none;">
+        <p style="font-size:11.5px; color:var(--txt3); margin-top:8px; line-height:1.5;">Non aggancia? Su iPhone la telecamera dal vivo può fare fatica: in alternativa <strong>scrivi o incolla il codice fiscale</strong> nel campo del form — data di nascita e sesso si compilano da soli.</p>
       </div>
     </div>`;
   document.body.appendChild(ov);
@@ -1283,87 +1286,42 @@ function apriScanTessera(onTrovato) {
 
   const setMsg = (t) => { const m = document.getElementById('ts-scan-msg'); if (m) m.textContent = t; };
 
-  // Fallback foto: su iPhone/Safari il lettore dal vivo è debole. Scattare una
-  // foto nitida con la fotocamera nativa e decodificarla è molto più affidabile.
-  const _fmtList = () => { const F = window.Html5QrcodeSupportedFormats; return F ? [F.CODE_39, F.CODE_128, F.CODE_93, F.ITF, F.CODABAR, F.EAN_13, F.QR_CODE] : undefined; };
-  const fotoBtn = ov.querySelector('#ts-foto-btn');
-  const fotoInput = ov.querySelector('#ts-foto-input');
-  if (fotoBtn && fotoInput && window.Html5Qrcode) {
-    fotoBtn.addEventListener('click', () => fotoInput.click());
-    fotoInput.addEventListener('change', () => {
-      const file = fotoInput.files && fotoInput.files[0];
-      if (!file) return;
-      setMsg('Analisi della foto…');
-      const trovato = (dec) => { chiudiScanTessera(); onTrovato(dec); };
-      // Evita blocchi: se una promessa non risponde entro N ms, si prosegue.
-      const conTimeout = (p, ms) => Promise.race([ Promise.resolve(p), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms)) ]);
-      let _ocrFatto = false;
-      // 2° tentativo: leggi il CF SCRITTO sulla tessera con l'OCR (funziona anche
-      // quando il barcode contiene solo il numero della tessera).
-      const provaOCR = () => {
-        if (_ocrFatto) return; _ocrFatto = true;
-        setMsg('Preparo il lettore del codice fiscale…');
-        _ocrCodiceFiscaleDaFoto(file, (status, prog) => {
-          const pct = Math.round((prog || 0) * 100);
-          if (/recogn/i.test(status)) setMsg('Leggo il codice fiscale… ' + pct + '%');
-          else setMsg('Preparo il lettore… ' + pct + '% (solo la prima volta)');
-        })
-          .then((testo) => {
-            const dec = decodeCodiceFiscale(testo);
-            if (dec) { trovato(dec); return; }
-            setMsg('Non sono riuscito a leggere il codice fiscale dalla foto. Rifalla nitida e ravvicinata sul CF (16 caratteri), oppure scrivilo a mano: data di nascita e sesso si compilano da soli.');
-          })
-          .catch(() => setMsg('Lettore non disponibile ora (serve connessione). Scrivi il codice fiscale a mano: data di nascita e sesso si compilano da soli.'));
-      };
-      // 1° tentativo: barcode dalla foto, ma con timeout: su iOS scanFile può
-      // impiantarsi senza mai rispondere → dopo 6s si passa all'OCR.
-      const analizza = () => {
-        const fmts = _fmtList();
-        const fileScanner = new Html5Qrcode('ts-scan-area', fmts ? { formatsToSupport: fmts } : undefined);
-        conTimeout(fileScanner.scanFile(file, false), 6000)
-          .then((testo) => {
-            const dec = decodeCodiceFiscale(testo);
-            if (dec) { trovato(dec); return; }
-            provaOCR(); // barcode letto ma non è un CF (es. numero tessera) → OCR
-          })
-          .catch(() => provaOCR()); // nessun barcode leggibile o timeout → OCR
-      };
-      // Ferma prima lo scanner dal vivo (async) per liberare l'area di rendering.
-      if (_tsScanner) { const s = _tsScanner; _tsScanner = null; Promise.resolve(s.stop()).catch(() => {}).then(analizza); }
-      else analizza();
-    });
-  }
+  if (!window.Quagga) { setMsg('Scanner non disponibile (serve la connessione per caricare la libreria). Scrivi o incolla il CF nel form: data e sesso si compilano da soli.'); return; }
 
-  if (!window.Html5Qrcode) { setMsg('Scanner non disponibile (serve la connessione per caricare la libreria). Inserisci il CF a mano.'); return; }
+  let _hit = false;
+  const onDetected = (res) => {
+    if (_hit) return;
+    const code = res && res.codeResult && res.codeResult.code;
+    if (!code) return;
+    const dec = decodeCodiceFiscale(code);
+    if (!dec) { setMsg('Letto “' + code + '” — non è un codice fiscale. Prova il barcode sul fronte, sotto il CF.'); return; }
+    _hit = true;
+    chiudiScanTessera();
+    onTrovato(dec);
+  };
+
   try {
-    const F = window.Html5QrcodeSupportedFormats;
-    const opts = {
-      // BarcodeDetector nativo del browser: molto più affidabile sui codici a
-      // barre lineari (Code 39) rispetto al lettore ZXing di fallback.
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-      verbose: false
-    };
-    if (F) opts.formatsToSupport = [F.CODE_39, F.CODE_128, F.CODE_93, F.ITF, F.CODABAR, F.EAN_13, F.QR_CODE];
-    _tsScanner = new Html5Qrcode('ts-scan-area', opts);
-    // Riquadro largo come un codice a barre + autofocus continuo.
-    const qrbox = (vw) => { const w = Math.floor(Math.min(vw || 320, 480) * 0.92); return { width: w, height: Math.max(90, Math.floor(w * 0.42)) }; };
-    const camera = { facingMode: { ideal: 'environment' }, advanced: [{ focusMode: 'continuous' }] };
-    _tsScanner.start(
-      camera,
-      { fps: 15, qrbox, aspectRatio: 1.7777 },
-      (testo) => {
-        const dec = decodeCodiceFiscale(testo);
-        if (!dec) { setMsg('Letto “' + testo + '” — non è un codice fiscale. Inquadra il barcode SOTTO il codice fiscale, sul fronte della tessera.'); return; }
-        chiudiScanTessera();
-        onTrovato(dec);
+    Quagga.init({
+      inputStream: {
+        type: 'LiveStream',
+        target: document.getElementById('ts-scan-area'),
+        constraints: { facingMode: 'environment' }
       },
-      () => {} // frame senza codice: ignora
-    ).then(() => setMsg('Fotocamera attiva: avvicina bene il codice a barre (quello sul fronte, sotto il CF) e tienilo fermo.'))
-     .catch(err => setMsg('Fotocamera non disponibile: ' + (err && err.message ? err.message : err)));
-  } catch (e) { setMsg('Errore scanner: ' + e.message); }
+      locator: { patchSize: 'medium', halfSample: true },
+      numOfWorkers: navigator.hardwareConcurrency ? Math.min(4, navigator.hardwareConcurrency) : 2,
+      frequency: 10,
+      decoder: { readers: ['code_39_reader', 'code_39_vin_reader', 'code_128_reader', 'i2of5_reader'] }
+    }, (err) => {
+      if (err) { setMsg('Fotocamera non disponibile: ' + (err && err.message ? err.message : err) + '. Scrivi il CF a mano nel form.'); return; }
+      _tsQuagga = true;
+      Quagga.onDetected(onDetected);
+      Quagga.start();
+      setMsg('Fotocamera attiva: avvicina il codice a barre (fronte, sotto il CF) e tienilo fermo e a fuoco.');
+    });
+  } catch (e) { setMsg('Errore scanner: ' + e.message + '. Scrivi il CF a mano nel form.'); }
 }
 function chiudiScanTessera() {
-  if (_tsScanner) { try { _tsScanner.stop().catch(() => {}); } catch (e) {} _tsScanner = null; }
+  if (_tsQuagga && window.Quagga) { try { Quagga.stop(); } catch (e) {} try { Quagga.offDetected(); } catch (e) {} _tsQuagga = false; }
   const ov = document.getElementById('ts-modal');
   if (ov) ov.remove();
   document.body.style.overflow = '';
@@ -1606,7 +1564,7 @@ const _VIEW_TITLES = {
   'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
   nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
   'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione',
-  'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code'
+  'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code', prestazioni: 'Prestazioni'
 };
 
 // Viste "dettaglio" → topbar mostra ← (back) invece di ☰
@@ -1691,6 +1649,9 @@ function renderSidebar() {
 
       <div class="sidebar-title">Kiosk</div>
       <div class="nav-item" data-view="qr">📲 Il mio QR</div>
+
+      <div class="sidebar-title">Configurazione</div>
+      <div class="nav-item" data-view="prestazioni">🧾 Prestazioni</div>
     `;
   } else if (sess.ruolo === 'firma') {
     const medNome = UTENTI[sess.medico] ? UTENTI[sess.medico].nome : sess.medico;
@@ -2354,11 +2315,32 @@ function fmtEuro(n) {
 
 const PRESTAZIONI_COMUNI = ['Visita oculistica', 'Visita oculistica di controllo', 'Tonometria', 'Campo visivo', 'OCT', 'Fondo oculare', 'Topografia corneale', 'Pachimetria', 'Rimozione corpo estraneo', 'Certificato'];
 
+// ── Prestazioni configurabili per medico (nome + prezzo opzionale) ────────────
+const LS_PRESTAZIONI = 'oculista_prestazioni';
+function _prestazioniStore() { try { return JSON.parse(localStorage.getItem(LS_PRESTAZIONI)) || {}; } catch { return {}; } }
+function prestazioniMedico(medico) { const all = _prestazioniStore(); return Array.isArray(all[medico]) ? all[medico] : []; }
+function salvaPrestazioniMedico(medico, lista) {
+  const all = _prestazioniStore(); all[medico] = lista;
+  localStorage.setItem(LS_PRESTAZIONI, JSON.stringify(all));
+}
+// Nomi prestazione per i datalist/filtri: personalizzate del medico + comuni.
+function prestazioniDisponibili(medico) {
+  const custom = prestazioniMedico(medico).map(x => x.nome).filter(Boolean);
+  return [...new Set([...custom, ...PRESTAZIONI_COMUNI])];
+}
+// Prezzo predefinito di una prestazione per il medico (se configurato).
+function prezzoPrestazione(medico, nome) {
+  const found = prestazioniMedico(medico).find(x => (x.nome || '').toLowerCase() === (nome || '').toLowerCase());
+  return found && found.prezzo != null && found.prezzo !== '' ? found.prezzo : null;
+}
+
 // Apre il modale di chiusura visita con parcellazione, sconto e stato pagamento.
 // Alla conferma salva il pagamento e porta il paziente a "Completato".
 function completaVisita(id, onDone) {
   const p = db.getPaziente(id);
   if (!p) return;
+  const _sessPag = sessionCorrente();
+  const medicoPag = p.medicoAssegnato || (_sessPag && _sessPag.user) || '';
   const pag = p.pagamento || {};
   let righe = (pag.prestazioni && pag.prestazioni.length) ? pag.prestazioni.map(x => ({ descrizione: x.descrizione || '', importo: x.importo != null ? String(x.importo) : '' })) : [{ descrizione: '', importo: '' }];
   let scontoVal = pag.sconto != null ? String(pag.sconto) : '';
@@ -2404,7 +2386,7 @@ function completaVisita(id, onDone) {
                 <button type="button" class="rm" title="Rimuovi" data-rm="${i}">×</button>
               </div>`).join('')}
           </div>
-          <datalist id="pay-datalist">${PRESTAZIONI_COMUNI.map(x => `<option value="${x}">`).join('')}</datalist>
+          <datalist id="pay-datalist">${prestazioniDisponibili(medicoPag).map(x => `<option value="${escapeHtml(x)}">`).join('')}</datalist>
           <button type="button" class="pay-add" id="pay-add">+ Aggiungi prestazione</button>
 
           <div class="pay-sconto">
@@ -2435,6 +2417,11 @@ function completaVisita(id, onDone) {
     ov.querySelector('#pay-add').onclick = () => { leggiDOM(); righe.push({ descrizione: '', importo: '' }); draw(); };
     ov.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { leggiDOM(); righe.splice(Number(b.dataset.rm), 1); if (!righe.length) righe.push({ descrizione: '', importo: '' }); draw(); });
     ov.querySelectorAll('.pay-imp, #pay-sconto').forEach(el => el.addEventListener('input', aggiornaTotale));
+    // Scegliendo una prestazione con prezzo configurato, precompila l'importo (se vuoto).
+    ov.querySelectorAll('.pay-desc').forEach(el => el.addEventListener('change', () => {
+      const row = el.closest('.pay-row'); const imp = row && row.querySelector('.pay-imp');
+      if (imp && !imp.value.trim()) { const pr = prezzoPrestazione(medicoPag, el.value); if (pr != null) { imp.value = String(pr); aggiornaTotale(); } }
+    }));
     ov.querySelectorAll('.pay-lbl').forEach(b => b.onclick = () => { leggiDOM(); statoPag = b.dataset.stato; draw(); });
     ov.querySelector('#pay-conferma').onclick = conferma;
   }
@@ -4124,7 +4111,9 @@ registerRenderer('lista-pazienti', function() {
 // Stato di ricerca persistente tra i render (quale tab è attivo)
 let _ricercaTab = 'paziente';
 let _ricercaQuery = '';
-let _ricercaFiltri = { chip: '', da: '', a: '', stato: '' };
+const _oggiISO = () => new Date().toISOString().slice(0, 10);
+// Di default la ricerca è impostata sulla giornata di oggi.
+let _ricercaFiltri = { chip: 'oggi', da: _oggiISO(), a: _oggiISO(), stato: '', prestazione: '' };
 
 // ── Ricerche recenti (ultime 5, in localStorage) ─────────────────────────────
 const LS_RICERCHE = 'oculista_ricerche_recenti';
@@ -4249,11 +4238,57 @@ function renderRicerca(container) {
       aTs:  f.a  ? Date.parse(f.a  + 'T23:59:59') : null
     };
   }
-  function filtriAttivi() { return !!(_ricercaFiltri.da || _ricercaFiltri.a || _ricercaFiltri.stato); }
+  function filtriAttivi() { return !!(_ricercaFiltri.da || _ricercaFiltri.a || _ricercaFiltri.stato || _ricercaFiltri.prestazione); }
   function passaFiltri(p) {
     if (_ricercaFiltri.stato && p.stato !== _ricercaFiltri.stato) return false;
     const { daTs, aTs } = periodoTs();
     return eventoNelPeriodo(p, daTs, aTs);
+  }
+  // p ha una prestazione col nome cercato tra quelle eseguite (pagamento)?
+  function haPrestazione(p, nome) {
+    if (!nome) return true;
+    const list = (p.pagamento && p.pagamento.prestazioni) || [];
+    return list.some(x => (x.descrizione || '').toLowerCase() === nome.toLowerCase());
+  }
+
+  // Etichetta leggibile del periodo attivo (per il totale).
+  function descrizionePeriodo() {
+    const f = _ricercaFiltri;
+    if (f.chip === 'oggi') return 'oggi';
+    if (f.chip === '7') return 'ultimi 7 giorni';
+    if (f.chip === '30') return 'ultimi 30 giorni';
+    if (f.da && f.a) return 'dal ' + f.da.split('-').reverse().join('/') + ' al ' + f.a.split('-').reverse().join('/');
+    if (f.da) return 'dal ' + f.da.split('-').reverse().join('/');
+    if (f.a) return 'fino al ' + f.a.split('-').reverse().join('/');
+    return 'tutto lo storico';
+  }
+
+  // Totale INCASSATO del periodo (default oggi). I "da incassare" compaiono
+  // solo dopo lo sblocco col tasto nascosto; l'incassato è sempre visibile.
+  function totaleIncassatoHtml() {
+    const { daTs, aTs } = periodoTs();
+    const prest = _ricercaFiltri.prestazione;
+    const _sT = sessionCorrente();
+    const meT = _sT ? _sT.user : null; // il totale è SEMPRE solo del medico loggato
+    let inc = 0, nInc = 0, att = 0, nAtt = 0;
+    db.getPazienti().forEach(p => {
+      const pg = p.pagamento; if (!pg) return;
+      if (meT && p.medicoAssegnato !== meT) return;
+      if (prest && !haPrestazione(p, prest)) return;
+      const ts = Date.parse(pg.ts || p.updatedAt || 0);
+      if ((daTs && ts < daTs) || (aTs && ts > aTs)) return;
+      if (pg.stato === 'incassato') { inc += pg.totale || 0; nInc++; }
+      else if (pg.stato === 'da_incassare') { att += pg.totale || 0; nAtt++; }
+    });
+    const extra = (_mostraDaIncassare && nAtt)
+      ? `<span style="margin-left:16px; color:var(--ambra-txt);">Da incassare: <strong>€ ${fmtEuro(att)}</strong> <span style="opacity:.8;">(${nAtt})</span></span>` : '';
+    return `
+      <div class="ricerca-totale" style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; padding:14px 16px; background:var(--card); border:1px solid var(--bordo); border-radius:12px; margin:12px 0;">
+        <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale incassato · ${descrizionePeriodo()}</span>
+        <strong style="font-size:1.5rem; color:var(--inchiostro);">€ ${fmtEuro(inc)}</strong>
+        <span style="font-size:0.85rem; color:var(--txt2);">${nInc} ${nInc === 1 ? 'visita' : 'visite'}${prest ? ' · ' + escapeHtml(prest) : ''}</span>
+        ${extra}
+      </div>`;
   }
 
   // ── Ricerca PAZIENTE: testo (fuzzy sul nome), anno di nascita, fascia d'età ──
@@ -4298,6 +4333,7 @@ function renderRicerca(container) {
     return refertati.map(p => {
       if (medicoFiltro && p.medicoAssegnato !== medicoFiltro) return null;
       if (!passaFiltri(p)) return null;
+      if (!haPrestazione(p, _ricercaFiltri.prestazione)) return null;
       const r = p.referto || {};
       const prest = (p.pagamento && p.pagamento.prestazioni || []).map(x => x.descrizione).join(', ');
       const campi = [
@@ -4411,6 +4447,13 @@ function renderRicerca(container) {
       <option value="bianchi">Dott. Bianchi</option>
     </select>` : '';
 
+  const _sessRic = sessionCorrente();
+  const _medRic = _sessRic ? _sessRic.user : '';
+  const opzioniPrest = ['', ...prestazioniDisponibili(_medRic)]
+    .map(x => `<option value="${escapeHtml(x)}" ${_ricercaFiltri.prestazione === x ? 'selected' : ''}>${x ? escapeHtml(x) : 'Tutte le prestazioni'}</option>`).join('');
+  const filtroPrestazione = _ricercaTab === 'referto'
+    ? `<select id="ricerca-prestazione" class="ricerca-select">${opzioniPrest}</select>` : '';
+
   const opzioniStato = ['', ...Object.values(STATI)]
     .map(s => `<option value="${s}" ${_ricercaFiltri.stato === s ? 'selected' : ''}>${s || 'Tutti gli stati'}</option>`).join('');
 
@@ -4438,6 +4481,7 @@ function renderRicerca(container) {
     <input id="ricerca-input" type="search" placeholder="${placeholderText}" autocomplete="off" value="${escapeHtml(_ricercaQuery)}"
       style="flex:1; min-width:200px; padding:10px 14px; border:1px solid var(--bordo); border-radius:10px; font-size:0.95rem; background:#fff;">
     ${filtroMedico}
+    ${filtroPrestazione}
     <select id="ricerca-stato" class="ricerca-select">${opzioniStato}</select>
   </div>
 
@@ -4452,6 +4496,7 @@ function renderRicerca(container) {
     ${filtriAttivi() ? '<button class="ricerca-chip" id="ricerca-pulisci" title="Pulisci filtri">× Pulisci</button>' : ''}
   </div>
 
+  ${totaleIncassatoHtml()}
   ${chipsRecenti}
   <div id="ricerca-rendiconto-box"></div>
 
@@ -4475,6 +4520,13 @@ function renderRicerca(container) {
   // Filtro stato
   container.querySelector('#ricerca-stato').addEventListener('change', (e) => {
     _ricercaFiltri.stato = e.target.value;
+    renderRicerca(container);
+  });
+
+  // Filtro prestazione (solo tab referto)
+  const selPrest = container.querySelector('#ricerca-prestazione');
+  if (selPrest) selPrest.addEventListener('change', (e) => {
+    _ricercaFiltri.prestazione = e.target.value;
     renderRicerca(container);
   });
 
@@ -4505,7 +4557,7 @@ function renderRicerca(container) {
   // Pulisci filtri
   const pulisci = container.querySelector('#ricerca-pulisci');
   if (pulisci) pulisci.addEventListener('click', () => {
-    _ricercaFiltri = { chip: '', da: '', a: '', stato: '' };
+    _ricercaFiltri = { chip: '', da: '', a: '', stato: '', prestazione: '' };
     renderRicerca(container);
   });
 
@@ -4522,6 +4574,50 @@ function renderRicerca(container) {
 registerRenderer('ricerca', function() {
   renderRicerca(document.getElementById('view-ricerca'));
 });
+
+// ── Renderer: Prestazioni configurabili per medico ────────────────────────────
+function renderPrestazioni(container) {
+  const sess = sessionCorrente();
+  if (!sess || sess.ruolo !== 'medico') { container.innerHTML = '<div class="ricerca-empty">Sezione riservata al medico.</div>'; return; }
+  const medico = sess.user;
+  const nomeMed = UTENTI[medico] ? UTENTI[medico].nome : medico;
+  let lista = prestazioniMedico(medico).slice();
+  const salva = () => salvaPrestazioniMedico(medico, lista);
+  const inp = 'padding:9px 11px;border:1px solid var(--bordo);border-radius:9px;background:#fff;font-size:0.9rem;color:var(--txt);outline:none;';
+
+  function draw() {
+    const righe = lista.length ? lista.map((x, i) => `
+      <div class="prest-row" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+        <input class="prest-nome" data-i="${i}" type="text" value="${escapeHtml(x.nome || '')}" placeholder="Nome prestazione" style="flex:1;min-width:0;${inp}">
+        <span style="display:inline-flex;align-items:center;gap:5px;color:var(--txt2);font-size:0.9rem;">€ <input class="prest-prezzo" data-i="${i}" type="text" inputmode="decimal" value="${x.prezzo != null ? escapeHtml(String(x.prezzo)) : ''}" placeholder="0,00" style="width:78px;${inp}"></span>
+        <button type="button" class="prest-del" data-i="${i}" title="Rimuovi" style="width:34px;height:34px;border:1px solid var(--bordo);border-radius:9px;background:#fff;color:var(--txt2);cursor:pointer;font-size:1.1rem;line-height:1;">×</button>
+      </div>`).join('') : '<div class="ricerca-empty">Nessuna prestazione configurata. Aggiungine una o importa quelle comuni.</div>';
+    container.innerHTML = `
+<div style="max-width:720px;">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+    <h2 style="font-size:1.6rem;margin:0;flex:1;">Prestazioni</h2>
+    <span style="font-size:0.85rem;color:var(--txt2);">${escapeHtml(nomeMed)}</span>
+  </div>
+  <p style="color:var(--txt2);font-size:0.9rem;margin:0 0 16px;">Le prestazioni che esegui: compaiono nei suggerimenti alla chiusura visita e come filtro nella ricerca referti. Il prezzo è facoltativo (precompila l'importo). Le modifiche si salvano da sole.</p>
+  <div class="card" style="padding:16px;">
+    <div id="prest-list">${righe}</div>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+      <button type="button" id="prest-add" class="pay-add">+ Aggiungi prestazione</button>
+      ${lista.length === 0 ? '<button type="button" id="prest-import" class="pay-add">Importa prestazioni comuni</button>' : ''}
+    </div>
+  </div>
+</div>`;
+    container.querySelectorAll('.prest-nome').forEach(el => el.addEventListener('input', e => { lista[+e.target.dataset.i].nome = e.target.value; salva(); }));
+    container.querySelectorAll('.prest-prezzo').forEach(el => el.addEventListener('input', e => { lista[+e.target.dataset.i].prezzo = e.target.value.trim(); salva(); }));
+    container.querySelectorAll('.prest-del').forEach(el => el.addEventListener('click', e => { lista.splice(+e.currentTarget.dataset.i, 1); salva(); draw(); }));
+    const add = container.querySelector('#prest-add');
+    if (add) add.addEventListener('click', () => { lista.push({ nome: '', prezzo: '' }); salva(); draw(); const ns = container.querySelectorAll('.prest-nome'); if (ns.length) ns[ns.length - 1].focus(); });
+    const imp = container.querySelector('#prest-import');
+    if (imp) imp.addEventListener('click', () => { lista = PRESTAZIONI_COMUNI.map(n => ({ nome: n, prezzo: '' })); salva(); draw(); });
+  }
+  draw();
+}
+registerRenderer('prestazioni', function() { renderPrestazioni(document.getElementById('view-prestazioni')); });
 
 // ── Renderer: nuovo paziente (dal lato medico) ────────────────────────────────
 // Renderer: "Nuovo paziente" del medico — stesso identico form della registrazione
