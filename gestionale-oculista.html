@@ -2301,32 +2301,34 @@ function badgeStato(stato) {
   return `<span class="badge ${cls}">${stato}</span>`;
 }
 
-// ── Icone minimali di stato e pagamento (per liste compatte su mobile) ────────
-const ICONE_STATO = {
-  [STATI.REGISTRATO]: { g: '○', c: '#8a897f', bg: '#efeee7' },
-  [STATI.IN_ATTESA]:  { g: '◷', c: '#7a5a12', bg: '#efeee7' },
-  [STATI.IN_CORSO]:   { g: '▶', c: '#2e7d32', bg: '#e6f0e6' },
-  [STATI.IN_STOP]:    { g: '‖', c: 'var(--ambra-txt)', bg: 'var(--ambra)' },
-  [STATI.REFERTATO]:  { g: '≡', c: '#2f6fb0', bg: '#e7eef7' },
-  [STATI.CONSENSO]:   { g: '✍', c: '#6d4b9f', bg: '#efe9f7' },
-  [STATI.COMPLETATO]: { g: '✓', c: '#ffffff', bg: 'var(--verde-pieno)' }
-};
-// Chip icona stato (larghezza fissa, glifo + colore, testo esteso nel title).
-function iconaStato(stato) {
-  const d = ICONE_STATO[stato] || ICONE_STATO[STATI.REGISTRATO];
-  return `<span class="ico-stato" title="${stato}" aria-label="Stato: ${stato}" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; font-size:14px; line-height:1; background:${d.bg}; color:${d.c}; flex:none;">${d.g}</span>`;
+// ── Icone minimali coerenti (SVG line, stessa griglia 24×24, stesso tratto) ────
+function _icoSvg(inner, color, title) {
+  return `<span title="${title}" aria-label="${title}" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; flex:none; color:${color};">`
+    + `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${inner}</svg></span>`;
 }
-// Chip icona pagamento: € verde = incassato, € ambra = da incassare.
+// Path SVG per ogni stato (stesso stile a linea).
+const SVG_STATO = {
+  [STATI.REGISTRATO]: { c: '#8a897f',          p: '<circle cx="12" cy="12" r="8.2"/><path d="M12 8.6v6.8M8.6 12h6.8"/>' },
+  [STATI.IN_ATTESA]:  { c: '#9a7b2e',          p: '<circle cx="12" cy="12" r="8.2"/><path d="M12 8.4V12l2.6 1.6"/>' },
+  [STATI.IN_CORSO]:   { c: '#2e7d32',          p: '<path d="M9 7.4l8 4.6-8 4.6z"/>' },
+  [STATI.IN_STOP]:    { c: 'var(--ambra-txt)', p: '<path d="M9.6 7v10M14.4 7v10"/>' },
+  [STATI.REFERTATO]:  { c: '#2f6fb0',          p: '<path d="M13.6 3.8H7.6A1.8 1.8 0 0 0 5.8 5.6v12.8a1.8 1.8 0 0 0 1.8 1.8h8.8a1.8 1.8 0 0 0 1.8-1.8V8.2z"/><path d="M13.6 3.8V8.2h4.6"/><path d="M9 12.6h6M9 15.4h4"/>' },
+  [STATI.CONSENSO]:   { c: '#6d4b9f',          p: '<path d="M13.6 3.8H7.6A1.8 1.8 0 0 0 5.8 5.6v12.8a1.8 1.8 0 0 0 1.8 1.8h8.8a1.8 1.8 0 0 0 1.8-1.8V8.2z"/><path d="M13.6 3.8V8.2h4.6"/><path d="M8.8 14.2l1.9 1.9 3.5-3.5"/>' },
+  [STATI.COMPLETATO]: { c: '#2e7d32',          p: '<circle cx="12" cy="12" r="8.2"/><path d="M8.4 12.2l2.6 2.5 4.6-4.8"/>' }
+};
+function iconaStato(stato) {
+  const d = SVG_STATO[stato] || SVG_STATO[STATI.REGISTRATO];
+  return _icoSvg(d.p, d.c, stato);
+}
+// Pagamento: stesso stile — € dentro un cerchio; verde = incassato, ambra = da incassare.
 function iconaPagamento(p) {
   const pg = p && p.pagamento;
   if (!pg || !pg.stato) return '';
   const inc = pg.stato === 'incassato';
-  const tot = fmtEuro(pg.totale || 0);
-  const bg = inc ? '#e6f0e6' : 'var(--ambra)';
-  const c  = inc ? '#2e7d32' : 'var(--ambra-txt)';
-  const g  = inc ? '€✓' : '€ !';
-  const lbl = inc ? ('Incassato € ' + tot) : ('Da incassare € ' + tot);
-  return `<span class="ico-pag" title="${lbl}" aria-label="${lbl}" style="display:inline-flex; align-items:center; justify-content:center; height:26px; padding:0 8px; border-radius:8px; font-size:12.5px; font-weight:700; line-height:1; background:${bg}; color:${c}; flex:none; white-space:nowrap;">${g}</span>`;
+  const color = inc ? '#2e7d32' : 'var(--ambra-txt)';
+  const title = (inc ? 'Incassato € ' : 'Da incassare € ') + fmtEuro(pg.totale || 0);
+  const inner = '<circle cx="12" cy="12" r="8.2"/><path d="M14.7 9.6a3.4 3.4 0 1 0 0 4.8"/><path d="M8.2 11.2h4.4M8.2 13h3.6"/>';
+  return _icoSvg(inner, color, title);
 }
 
 // ── setStato ──────────────────────────────────────────────────────────────────
