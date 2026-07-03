@@ -4301,24 +4301,27 @@ function renderRicerca(container) {
       if (pg.stato === 'incassato') { inc += pg.totale || 0; nInc++; }
       else if (pg.stato === 'da_incassare') { att += pg.totale || 0; nAtt++; }
     });
-    // Col tasto nascosto attivo si mostra anche il da-incassare e il totale
-    // complessivo (incassato + da incassare) del periodo.
+    // Layout "scontrino": etichetta a sinistra, importo a destra.
     const mostraAtt = _mostraDaIncassare && nAtt;
-    const rigaComplessivo = mostraAtt ? `
-        <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid var(--bordo);">
-          <span style="color:var(--ambra-txt); font-size:0.9rem;">Da incassare: <strong>€ ${fmtEuro(att)}</strong> <span style="opacity:.8;">(${nAtt})</span></span>
-          <span style="margin-left:auto; font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale complessivo</span>
-          <strong style="font-size:1.25rem; color:var(--inchiostro);">€ ${fmtEuro(inc + att)}</strong>
-          <span style="font-size:0.8rem; color:var(--txt2);">${nInc + nAtt} ${(nInc + nAtt) === 1 ? 'visita' : 'visite'}</span>
-        </div>` : '';
+    const nVisite = (n) => n + ' ' + (n === 1 ? 'visita' : 'visite');
+    const riga = (lbl, val, n, o = {}) => `
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; ${o.top ? 'margin-top:11px; padding-top:11px; border-top:1px solid var(--bordo);' : 'margin-top:9px;'}">
+          <span style="font-size:${o.big ? '0.98rem' : '0.9rem'}; font-weight:${o.big ? 600 : 500}; color:${o.color || 'var(--txt)'};">${lbl}</span>
+          <span style="white-space:nowrap; text-align:right;">
+            <strong style="font-size:${o.big ? '1.55rem' : '1.05rem'}; color:${o.color || 'var(--inchiostro)'}; letter-spacing:-.01em;">€&nbsp;${fmtEuro(val)}</strong>
+            <span style="display:block; font-size:0.72rem; color:var(--txt3);">${nVisite(n)}</span>
+          </span>
+        </div>`;
+    const header = `<div style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Incassi · ${descrizionePeriodo()}${prest ? ' · ' + escapeHtml(prest) : ''}</div>`;
+    const corpo = mostraAtt
+      ? riga('Incassato', inc, nInc, { color: 'var(--inchiostro)' })
+        + riga('Da incassare', att, nAtt, { color: 'var(--ambra-txt)' })
+        + riga('Totale', inc + att, nInc + nAtt, { top: true, big: true })
+      : riga('Incassato', inc, nInc, { big: true, color: 'var(--inchiostro)' });
     return `
       <div class="ricerca-totale" style="padding:14px 16px; background:var(--card); border:1px solid var(--bordo); border-radius:12px; margin:12px 0;">
-        <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
-          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--txt2);">Totale incassato · ${descrizionePeriodo()}</span>
-          <strong style="font-size:1.5rem; color:var(--inchiostro);">€ ${fmtEuro(inc)}</strong>
-          <span style="font-size:0.85rem; color:var(--txt2);">${nInc} ${nInc === 1 ? 'visita' : 'visite'}${prest ? ' · ' + escapeHtml(prest) : ''}</span>
-        </div>
-        ${rigaComplessivo}
+        ${header}
+        ${corpo}
       </div>`;
   }
 
