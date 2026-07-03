@@ -2388,6 +2388,16 @@ function completaVisita(id, onDone) {
           </div>
           <datalist id="pay-datalist">${prestazioniDisponibili(medicoPag).map(x => `<option value="${escapeHtml(x)}">`).join('')}</datalist>
           <button type="button" class="pay-add" id="pay-add">+ Aggiungi prestazione</button>
+          ${(() => {
+            const mie = prestazioniMedico(medicoPag);
+            if (!mie.length) return `<div style="margin-top:12px; font-size:12px; color:var(--txt2);">Nessuna prestazione configurata — aggiungile in <strong>Prestazioni</strong> per averle qui pronte da toccare.</div>`;
+            return `<div style="margin-top:14px;">
+              <div style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8a897f; margin-bottom:8px;">Le tue prestazioni · tocca per aggiungere</div>
+              <div style="display:flex; flex-wrap:wrap; gap:7px;">
+                ${mie.map(x => `<button type="button" class="pay-chip" data-nome="${escapeHtml(x.nome)}" data-prezzo="${escapeHtml(x.prezzo != null ? String(x.prezzo) : '')}" style="padding:6px 12px; border:1px solid #d6d4cb; border-radius:999px; background:#fff; font-size:12.5px; cursor:pointer; color:#16150f;">${escapeHtml(x.nome)}${x.prezzo != null && x.prezzo !== '' ? ` · € ${escapeHtml(String(x.prezzo))}` : ''}</button>`).join('')}
+              </div>
+            </div>`;
+          })()}
 
           <div class="pay-sconto">
             <span style="font-size:0.85rem; color:var(--txt2);">Sconto €</span>
@@ -2423,6 +2433,17 @@ function completaVisita(id, onDone) {
       if (imp && !imp.value.trim()) { const pr = prezzoPrestazione(medicoPag, el.value); if (pr != null) { imp.value = String(pr); aggiornaTotale(); } }
     }));
     ov.querySelectorAll('.pay-lbl').forEach(b => b.onclick = () => { leggiDOM(); statoPag = b.dataset.stato; draw(); });
+    // Chip prestazioni configurate: un tap aggiunge la prestazione (con prezzo) alla parcella.
+    ov.querySelectorAll('.pay-chip').forEach(b => b.onclick = () => {
+      leggiDOM();
+      const nome = b.dataset.nome || '';
+      const prezzo = b.dataset.prezzo || '';
+      let row = righe.find(r => !String(r.descrizione || '').trim() && !String(r.importo || '').trim());
+      if (!row) { row = { descrizione: '', importo: '' }; righe.push(row); }
+      row.descrizione = nome;
+      if (prezzo && !String(row.importo || '').trim()) row.importo = prezzo;
+      draw();
+    });
     ov.querySelector('#pay-conferma').onclick = conferma;
   }
   function chiudi() { ov.remove(); document.body.style.overflow = ''; }
