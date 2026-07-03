@@ -3140,9 +3140,13 @@ function renderReferto(container, id) {
   const od = r.refOD || {};
   const os = r.refOS || {};
 
-  function inp(field, value, placeholder) {
+  function inp(field, value, placeholder, extra) {
     const v = (value || '').toString().replace(/"/g, '&quot;');
-    return `<input type="text" data-field="${field}" value="${v}" placeholder="${placeholder || ''}">`;
+    return `<input type="text" data-field="${field}" value="${v}" placeholder="${placeholder || ''}"${extra ? ' ' + extra : ''}>`;
+  }
+  // Campo "decimi": si digita solo il numero e diventa "N/10" uscendo dal campo.
+  function inpDec(field, value) {
+    return inp(field, value, 'Es. 8', 'data-decimi="1" inputmode="decimal"');
   }
   function ta(field, value, placeholder) {
     const v = (value || '').toString().replace(/</g, '&lt;');
@@ -3199,11 +3203,11 @@ function renderReferto(container, id) {
       <div class="form-grid">
         <div class="form-field">
           <label>Visus OD</label>
-          ${inp('referto.visusOD', r.visusOD, 'Es. 10/10')}
+          ${inpDec('referto.visusOD', r.visusOD)}
         </div>
         <div class="form-field">
           <label>Visus OS</label>
-          ${inp('referto.visusOS', r.visusOS, 'Es. 10/10')}
+          ${inpDec('referto.visusOS', r.visusOS)}
         </div>
       </div>
     </div>
@@ -3214,19 +3218,19 @@ function renderReferto(container, id) {
       <div class="form-grid">
         <div class="form-field">
           <label>Per Lontano — OD</label>
-          ${inp('referto.acuitaLontanoOD', r.acuitaLontanoOD, 'Es. 10/10')}
+          ${inpDec('referto.acuitaLontanoOD', r.acuitaLontanoOD)}
         </div>
         <div class="form-field">
           <label>Per Lontano — OS</label>
-          ${inp('referto.acuitaLontanoOS', r.acuitaLontanoOS, 'Es. 10/10')}
+          ${inpDec('referto.acuitaLontanoOS', r.acuitaLontanoOS)}
         </div>
         <div class="form-field">
           <label>Per Vicino — OD</label>
-          ${inp('referto.acuitaVicinoOD', r.acuitaVicinoOD, 'Es. 10/10')}
+          ${inpDec('referto.acuitaVicinoOD', r.acuitaVicinoOD)}
         </div>
         <div class="form-field">
           <label>Per Vicino — OS</label>
-          ${inp('referto.acuitaVicinoOS', r.acuitaVicinoOS, 'Es. 10/10')}
+          ${inpDec('referto.acuitaVicinoOS', r.acuitaVicinoOS)}
         </div>
       </div>
     </div>
@@ -3332,6 +3336,18 @@ function renderReferto(container, id) {
 </div>`;
 
   container.querySelector('#btn-back-referto').addEventListener('click', () => showView('board'));
+
+  // Campi "decimi": digitando solo il numero, uscendo dal campo diventa "N/10".
+  // Numeri non decimali (es. "conta dita") o valori già con "/" restano invariati.
+  function formattaDecimi(val) {
+    const s = (val || '').trim();
+    if (!s || s.includes('/')) return s;
+    return /^\d{1,2}([.,]\d)?$/.test(s) ? s + '/10' : s;
+  }
+  container.querySelectorAll('input[data-decimi]').forEach(el => {
+    el.addEventListener('blur', () => { el.value = formattaDecimi(el.value); });
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.value = formattaDecimi(el.value); el.blur(); } });
+  });
 
   function salvaReferto() {
     const referto = leggiRefertoDalForm(container);
