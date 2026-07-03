@@ -2301,6 +2301,34 @@ function badgeStato(stato) {
   return `<span class="badge ${cls}">${stato}</span>`;
 }
 
+// ── Icone minimali di stato e pagamento (per liste compatte su mobile) ────────
+const ICONE_STATO = {
+  [STATI.REGISTRATO]: { g: '○', c: '#8a897f', bg: '#efeee7' },
+  [STATI.IN_ATTESA]:  { g: '◷', c: '#7a5a12', bg: '#efeee7' },
+  [STATI.IN_CORSO]:   { g: '▶', c: '#2e7d32', bg: '#e6f0e6' },
+  [STATI.IN_STOP]:    { g: '‖', c: 'var(--ambra-txt)', bg: 'var(--ambra)' },
+  [STATI.REFERTATO]:  { g: '≡', c: '#2f6fb0', bg: '#e7eef7' },
+  [STATI.CONSENSO]:   { g: '✍', c: '#6d4b9f', bg: '#efe9f7' },
+  [STATI.COMPLETATO]: { g: '✓', c: '#ffffff', bg: 'var(--verde-pieno)' }
+};
+// Chip icona stato (larghezza fissa, glifo + colore, testo esteso nel title).
+function iconaStato(stato) {
+  const d = ICONE_STATO[stato] || ICONE_STATO[STATI.REGISTRATO];
+  return `<span class="ico-stato" title="${stato}" aria-label="Stato: ${stato}" style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:8px; font-size:14px; line-height:1; background:${d.bg}; color:${d.c}; flex:none;">${d.g}</span>`;
+}
+// Chip icona pagamento: € verde = incassato, € ambra = da incassare.
+function iconaPagamento(p) {
+  const pg = p && p.pagamento;
+  if (!pg || !pg.stato) return '';
+  const inc = pg.stato === 'incassato';
+  const tot = fmtEuro(pg.totale || 0);
+  const bg = inc ? '#e6f0e6' : 'var(--ambra)';
+  const c  = inc ? '#2e7d32' : 'var(--ambra-txt)';
+  const g  = inc ? '€✓' : '€ !';
+  const lbl = inc ? ('Incassato € ' + tot) : ('Da incassare € ' + tot);
+  return `<span class="ico-pag" title="${lbl}" aria-label="${lbl}" style="display:inline-flex; align-items:center; justify-content:center; height:26px; padding:0 8px; border-radius:8px; font-size:12.5px; font-weight:700; line-height:1; background:${bg}; color:${c}; flex:none; white-space:nowrap;">${g}</span>`;
+}
+
 // ── setStato ──────────────────────────────────────────────────────────────────
 function setStato(id, stato) {
   pushEvento(id, stato);
@@ -4393,20 +4421,19 @@ function renderRicerca(container) {
   function rigaRisultato(item, q, mostraMedico) {
     const { p, label, valore } = item;
     const nome = nomeCompleto(p) || '(senza nome)';
-    const med = mostraMedico ? `<span style="font-size:0.8rem;color:var(--txt2);">${nomeMedico(p.medicoAssegnato)}</span>` : '';
-    // Contrassegno visite ancora da incassare (visibili solo col tasto nascosto).
+    const med = mostraMedico ? `<span style="font-size:0.78rem; color:var(--txt2); flex:none; white-space:nowrap;">${nomeMedico(p.medicoAssegnato)}</span>` : '';
     const daInc = (p.pagamento && p.pagamento.stato === 'da_incassare');
-    const pillDaInc = daInc
-      ? `<span style="font-size:0.7rem; color:var(--ambra-txt); background:var(--ambra); padding:2px 9px; border-radius:999px; white-space:nowrap; font-weight:600;">● Da incassare € ${fmtEuro(p.pagamento.totale || 0)}</span>` : '';
+    // Nota importo da incassare sulla seconda riga (l'intestazione resta compatta).
+    const notaDaInc = daInc
+      ? ` <span style="color:var(--ambra-txt); font-weight:600; white-space:nowrap;">· da incassare € ${fmtEuro(p.pagamento.totale || 0)}</span>` : '';
     return `
       <div class="ricerca-result" data-id="${p.id}" title="Apri dettaglio"${daInc ? ' style="border-left:3px solid var(--ambra-txt);"' : ''}>
-        <div class="ricerca-result-head">
-          <span class="ricerca-result-nome">${evidenzia(nome, q)}</span>
+        <div class="ricerca-result-head" style="display:flex; align-items:center; gap:8px;">
+          <span class="ricerca-result-nome" style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${evidenzia(nome, q)}</span>
           ${med}
-          ${pillDaInc}
-          ${badgeStato(p.stato)}
+          <span style="display:inline-flex; gap:6px; flex:none;">${iconaPagamento(p)}${iconaStato(p.stato)}</span>
         </div>
-        <div class="ricerca-snippet"><strong>${label}:</strong> ${snippet(valore, q)}</div>
+        <div class="ricerca-snippet"><strong>${label}:</strong> ${snippet(valore, q)}${notaDaInc}</div>
       </div>`;
   }
 
