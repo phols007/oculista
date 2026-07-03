@@ -479,7 +479,7 @@
     .bd2-counts { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
     .bd2-counts span { font-size: 0.86rem; color: var(--txt2); white-space: nowrap; }
     .bd2-counts b { font-size: 1.05rem; font-weight: 700; color: var(--txt); margin-right: 4px; font-variant-numeric: tabular-nums; }
-    .bd2-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; align-items: start; }
+    .bd2-cols { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; align-items: start; }
     .bd2-cols-single { grid-template-columns: 1fr; max-width: 520px; }
     .bd2-col { padding: 0 16px; border-right: 1px solid var(--bordo); min-width: 0; }
     .bd2-col:first-child { padding-left: 0; }
@@ -2921,11 +2921,18 @@ function renderBoard(container, filtroSoloAttesa) {
   );
 
   // Da completare: solo Refertati (da firmare) e Consenso firmato (da chiudere).
-  // I Completati sono storico → vivono nella Lista, non affollano la board.
+  // Da completare: solo Refertati (da firmare) e Consenso firmato (da chiudere).
   const postVisita = tutti.filter(p =>
     (p.stato === STATI.REFERTATO || p.stato === STATI.CONSENSO) &&
     p.medicoAssegnato === me
   );
+
+  // Completati OGGI: throughput della giornata (lo storico completo resta nella Lista).
+  const _oggi0 = new Date(); _oggi0.setHours(0, 0, 0, 0);
+  const completati = tutti.filter(p =>
+    p.stato === STATI.COMPLETATO && p.medicoAssegnato === me &&
+    Date.parse(inizioStatoCorrente(p)) >= _oggi0.getTime()
+  ).sort((a, b) => Date.parse(inizioStatoCorrente(b)) - Date.parse(inizioStatoCorrente(a)));
 
   // Ordina la coda d'attesa: chi aspetta da più tempo in alto
   inAttesa.sort((a, b) => Date.parse(inizioStatoCorrente(a)) - Date.parse(inizioStatoCorrente(b)));
@@ -2974,10 +2981,11 @@ function renderBoard(container, filtroSoloAttesa) {
   }
 
   const ICO_COL = {
-    attesa: { p: ICO.clock, c: '#9a7b2e' },
-    corso:  { p: ICO.play,  c: '#2e7d32' },
-    stop:   { p: ICO.pause, c: 'var(--ambra-txt)' },
-    compl:  { p: ICO.check, c: '#2f6fb0' }
+    attesa: { p: ICO.clock,   c: '#9a7b2e' },
+    corso:  { p: ICO.play,    c: '#2e7d32' },
+    stop:   { p: ICO.pause,   c: 'var(--ambra-txt)' },
+    compl:  { p: ICO.filePen, c: '#2f6fb0' },
+    fatto:  { p: ICO.check,   c: '#2e7d32' }
   };
   function colonna(titolo, lista, tipo, dotCls) {
     const righe = lista.length
@@ -3004,7 +3012,8 @@ function renderBoard(container, filtroSoloAttesa) {
         ${filtroSoloAttesa ? '' : `
         <span><b>${inCorso.length}</b>in corso</span>
         <span><b>${inStop.length}</b>in stop</span>
-        <span><b>${postVisita.length}</b>da completare</span>`}
+        <span><b>${postVisita.length}</b>da completare</span>
+        <span><b>${completati.length}</b>completati oggi</span>`}
       </div>
     </div>`;
 
@@ -3016,6 +3025,7 @@ function renderBoard(container, filtroSoloAttesa) {
     html += colonna('In corso', inCorso, 'corso', 'corso');
     html += colonna('In stop', inStop, 'stop', 'stop');
     html += colonna('Da completare', postVisita, 'compl', 'compl');
+    html += colonna('Completati oggi', completati, 'fatto', 'compl');
   }
   html += '</div>';
 
