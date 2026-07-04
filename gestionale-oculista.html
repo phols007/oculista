@@ -4810,8 +4810,10 @@ function renderAgenda(container) {
           <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:2px;">${tel}${arrivato}</div>
           ${note}
         </div>
-        <div style="display:flex; gap:6px; flex:none;" onclick="event.stopPropagation();">
-          ${a.arrivato ? '' : `<button class="agenda-btn" data-checkin="${a.id}" title="Segna arrivato → Sala d'attesa">→ Sala</button>`}
+        <div style="display:flex; gap:6px; align-items:center; flex:none;" onclick="event.stopPropagation();">
+          ${a.arrivato ? '' : (a.anagrafica
+            ? `<button class="agenda-btn" data-checkin="${a.id}" title="Paziente già in anagrafica: mettilo in sala d'attesa con i suoi dati (senza rifare il QR)">→ Sala</button>`
+            : `<span style="font-size:0.7rem; color:var(--txt3); white-space:nowrap;" title="Paziente nuovo: si registra da solo con il QR all'arrivo">si registra da QR</span>`)}
           <button class="agenda-btn" data-del="${a.id}" title="Elimina" style="color:#b23a2f;">${_svgInline(trash, 14)}</button>
         </div>
       </div>`;
