@@ -2407,6 +2407,20 @@ function eliminaAppuntamento(medico, id) { _salvaAppuntMedico(medico, appuntamen
 function appuntamentiDelGiorno(medico, dataISO) {
   return appuntamentiMedico(medico).filter(x => x.data === dataISO).sort((a, b) => (a.ora || '').localeCompare(b.ora || ''));
 }
+// Anagrafiche uniche dei pazienti del medico (per l'autocompletamento in agenda).
+function anagraficheMedico(medico) {
+  const seen = new Map();
+  db.getPazienti().forEach(p => {
+    if (p.medicoAssegnato !== medico) return;
+    const a = p.anagrafica || {};
+    if (!(a.cognome || a.nome)) return;
+    const key = (a.codiceFiscale || (a.cognome + '|' + a.nome + '|' + a.dataNascita)).toLowerCase();
+    const rec = { cognome: a.cognome || '', nome: a.nome || '', telefono: a.telefono || '', codiceFiscale: a.codiceFiscale || '', dataNascita: a.dataNascita || '', sesso: a.sesso || '' };
+    if (!seen.has(key)) seen.set(key, rec);
+    else if (!seen.get(key).telefono && rec.telefono) seen.set(key, rec);
+  });
+  return [...seen.values()].sort((x, y) => (x.cognome + x.nome).localeCompare(y.cognome + y.nome));
+}
 
 // Apre il modale di chiusura visita con parcellazione, sconto e stato pagamento.
 // Alla conferma salva il pagamento e porta il paziente a "Completato".
@@ -4842,10 +4856,21 @@ registerRenderer('agenda', function() { renderAgenda(document.getElementById('vi
 function checkinAppuntamento(medico, appt) {
   const p = { ...nuovoPaziente(), stato: STATI.REGISTRATO };
   p.medicoAssegnato = medico;
-  const parts = (appt.paziente || '').trim().split(/\s+/);
-  p.anagrafica.cognome = parts[0] || (appt.paziente || '');
-  p.anagrafica.nome = parts.slice(1).join(' ');
-  p.anagrafica.telefono = appt.telefono || '';
+  const snap = appt.anagrafica;
+  if (snap) {
+    // Paziente scelto dall'anagrafica: riusa i suoi dati (nuova visita, non tocca lo storico).
+    p.anagrafica.cognome = snap.cognome || '';
+    p.anagrafica.nome = snap.nome || '';
+    p.anagrafica.telefono = snap.telefono || appt.telefono || '';
+    p.anagrafica.codiceFiscale = snap.codiceFiscale || '';
+    p.anagrafica.dataNascita = snap.dataNascita || '';
+    p.anagrafica.sesso = snap.sesso || '';
+  } else {
+    const parts = (appt.paziente || '').trim().split(/\s+/);
+    p.anagrafica.cognome = parts[0] || (appt.paziente || '');
+    p.anagrafica.nome = parts.slice(1).join(' ');
+    p.anagrafica.telefono = appt.telefono || '';
+  }
   const salvato = db.savePaziente(p);
   pushEvento(salvato.id, STATI.REGISTRATO);
   salvaAppuntamento(medico, { id: appt.id, arrivato: true, pazienteId: salvato.id });
@@ -4872,7 +4897,7 @@ function apriModaleAppuntamento(medico, appt, onSave) {
           <div><label style="${lab}">Durata</label><select id="appt-durata" style="${fld}">${durate.map(d => `<option value="${d}" ${(+a.durata || 20) === d ? 'selected' : ''}>${d} min</option>`).join('')}</select></div>
           <div><label style="${lab}">Prestazione</label><select id="appt-prest" style="${fld}">${prestOpts}</select></div>
         </div>
-        <div style="margin-top:12px;"><label style="${lab}">Paziente *</label><input type="text" id="appt-paz" value="${escapeHtml(a.paziente || '')}" placeholder="Cognome Nome" style="${fld}"></div>
+        <div style="margin-top:12px; position:relative;"><label style="${lab}">Paziente * <span style="text-transform:none; letter-spacing:0; color:var(--txt3);">— cerca in anagrafica o scrivi un nome nuovo</span></label><input type="text" id="appt-paz" autocomplete="off" value="${escapeHtml(a.paziente || '')}" placeholder="Cognome Nome" style="${fld}"><div id="appt-sugg" style="position:absolute; left:0; right:0; top:100%; z-index:20; background:#fff; border:1px solid var(--bordo); border-radius:9px; margin-top:4px; max-height:220px; overflow:auto; display:none; box-shadow:0 8px 24px rgba(0,0,0,.10);"></div></div>
         <div style="margin-top:12px;"><label style="${lab}">Telefono</label><input type="tel" id="appt-tel" value="${escapeHtml(a.telefono || '')}" placeholder="+39 320 000 0000" style="${fld}"></div>
         <div style="margin-top:12px;"><label style="${lab}">Note</label><textarea id="appt-note" rows="2" style="${fld}">${escapeHtml(a.note || '')}</textarea></div>
         <div id="appt-err" style="color:#b23a2f; font-size:12.5px; margin-top:10px;"></div>
@@ -4888,6 +4913,38 @@ function apriModaleAppuntamento(medico, appt, onSave) {
   ov.addEventListener('click', e => { if (e.target === ov) chiudi(); });
   ov.querySelector('#appt-x').onclick = chiudi;
   ov.querySelector('#appt-annulla').onclick = chiudi;
+
+  // Autocompletamento paziente dall'anagrafica del medico.
+  let selezionato = (appt && appt.anagrafica) ? appt.anagrafica : null;
+  const anagrafiche = anagraficheMedico(medico);
+  const pazInput = ov.querySelector('#appt-paz');
+  const telInput = ov.querySelector('#appt-tel');
+  const suggBox = ov.querySelector('#appt-sugg');
+  function mostraSugg() {
+    const q = pazInput.value.trim().toLowerCase();
+    if (!q) { suggBox.style.display = 'none'; return; }
+    const res = anagrafiche.filter(x =>
+      (x.cognome + ' ' + x.nome).toLowerCase().includes(q) || (x.codiceFiscale || '').toLowerCase().includes(q)
+    ).slice(0, 8);
+    if (!res.length) { suggBox.style.display = 'none'; return; }
+    suggBox.innerHTML = res.map((x, i) => {
+      const meta = [x.dataNascita, x.telefono].filter(Boolean).map(escapeHtml).join(' · ');
+      return `<div class="appt-sugg-item" data-i="${i}" style="padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--bordo); font-size:0.9rem;">${escapeHtml((x.cognome + ' ' + x.nome).trim())}${meta ? ` <span style="color:var(--txt3); font-size:0.8rem;">· ${meta}</span>` : ''}</div>`;
+    }).join('');
+    suggBox.style.display = 'block';
+    suggBox.querySelectorAll('.appt-sugg-item').forEach(el => el.onmousedown = (e) => {
+      e.preventDefault();
+      const x = res[+el.dataset.i];
+      pazInput.value = (x.cognome + ' ' + x.nome).trim();
+      if (x.telefono) telInput.value = x.telefono;
+      selezionato = x;
+      suggBox.style.display = 'none';
+    });
+  }
+  pazInput.addEventListener('input', () => { selezionato = null; mostraSugg(); });
+  pazInput.addEventListener('focus', mostraSugg);
+  pazInput.addEventListener('blur', () => setTimeout(() => { suggBox.style.display = 'none'; }, 150));
+
   ov.querySelector('#appt-salva').onclick = () => {
     const paz = ov.querySelector('#appt-paz').value.trim();
     const data = ov.querySelector('#appt-data').value;
@@ -4899,7 +4956,10 @@ function apriModaleAppuntamento(medico, appt, onSave) {
       data, ora, durata: +ov.querySelector('#appt-durata').value,
       paziente: paz, telefono: ov.querySelector('#appt-tel').value.trim(),
       prestazione: ov.querySelector('#appt-prest').value,
-      note: ov.querySelector('#appt-note').value.trim()
+      note: ov.querySelector('#appt-note').value.trim(),
+      // Se scelto dall'anagrafica, conserva lo snapshot per un check-in ricco;
+      // se il nome è stato modificato a mano, resta una prenotazione "nuovo nome".
+      anagrafica: (selezionato && (selezionato.cognome + ' ' + selezionato.nome).trim().toLowerCase() === paz.toLowerCase()) ? selezionato : null
     });
     _agendaData = data;
     chiudi(); if (onSave) onSave();
