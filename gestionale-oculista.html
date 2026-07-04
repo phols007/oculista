@@ -516,6 +516,9 @@
     .bd2-row:hover .bd2-quick { opacity: 1; pointer-events: auto; }
     .bd2-row:hover .bd2-time, .bd2-row:hover .bd2-info { opacity: 0; }
     .bd2-empty { font-size: 0.76rem; color: #a1a1a6; padding: 8px 6px; }
+    .agenda-btn { padding: 6px 11px; border: 1px solid var(--bordo); border-radius: 8px; background: #fff; color: var(--txt); font-size: 0.82rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; line-height: 1; }
+    .agenda-btn:hover { background: var(--card); }
+    .agenda-appt:hover { background: rgba(0,0,0,.03); }
     @media (max-width: 820px) {
       .bd2-cols { grid-template-columns: 1fr; gap: 22px; }
       .bd2-col { padding: 0; border-right: none; }
@@ -983,6 +986,9 @@
     </div>
     <div id="view-prestazioni" class="view">
       <!-- Populated by renderPrestazioni -->
+    </div>
+    <div id="view-agenda" class="view">
+      <!-- Populated by renderAgenda -->
     </div>
   </div>
 </div>
@@ -1564,7 +1570,7 @@ const _VIEW_TITLES = {
   'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
   nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
   'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione',
-  'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code', prestazioni: 'Prestazioni'
+  'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code', prestazioni: 'Prestazioni', agenda: 'Agenda'
 };
 
 // Viste "dettaglio" → topbar mostra ← (back) invece di ☰
@@ -1638,6 +1644,7 @@ function renderSidebar() {
     nav = `
       <div class="sidebar-title">Lavoro</div>
       <div class="nav-item" data-view="board">📋 Board</div>
+      <div class="nav-item" data-view="agenda">📅 Agenda</div>
 
       <div class="sidebar-title">Pazienti</div>
       <div class="nav-item" data-view="lista-pazienti">🗂 Lista</div>
@@ -2376,6 +2383,29 @@ function prestazioniDisponibili(medico) {
 function prezzoPrestazione(medico, nome) {
   const found = prestazioniMedico(medico).find(x => (x.nome || '').toLowerCase() === (nome || '').toLowerCase());
   return found && found.prezzo != null && found.prezzo !== '' ? found.prezzo : null;
+}
+
+// ── Appuntamenti / Agenda per medico (localStorage, dati separati per medico) ──
+const LS_APPUNTAMENTI = 'oculista_appuntamenti';
+function _appuntStore() { try { return JSON.parse(localStorage.getItem(LS_APPUNTAMENTI)) || {}; } catch { return {}; } }
+function appuntamentiMedico(medico) { const a = _appuntStore(); return Array.isArray(a[medico]) ? a[medico] : []; }
+function _salvaAppuntMedico(medico, lista) { const a = _appuntStore(); a[medico] = lista; localStorage.setItem(LS_APPUNTAMENTI, JSON.stringify(a)); }
+function salvaAppuntamento(medico, appt) {
+  const lista = appuntamentiMedico(medico);
+  if (appt.id) {
+    const i = lista.findIndex(x => x.id === appt.id);
+    if (i >= 0) lista[i] = { ...lista[i], ...appt }; else lista.push(appt);
+  } else {
+    appt.id = 'a-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    appt.createdAt = new Date().toISOString();
+    lista.push(appt);
+  }
+  _salvaAppuntMedico(medico, lista);
+  return appt;
+}
+function eliminaAppuntamento(medico, id) { _salvaAppuntMedico(medico, appuntamentiMedico(medico).filter(x => x.id !== id)); }
+function appuntamentiDelGiorno(medico, dataISO) {
+  return appuntamentiMedico(medico).filter(x => x.data === dataISO).sort((a, b) => (a.ora || '').localeCompare(b.ora || ''));
 }
 
 // Apre il modale di chiusura visita con parcellazione, sconto e stato pagamento.
@@ -4734,6 +4764,150 @@ function renderPrestazioni(container) {
   draw();
 }
 registerRenderer('prestazioni', function() { renderPrestazioni(document.getElementById('view-prestazioni')); });
+
+// ── Renderer: Agenda appuntamenti ─────────────────────────────────────────────
+let _agendaData = null; // giorno visualizzato (YYYY-MM-DD)
+function renderAgenda(container) {
+  const sess = sessionCorrente();
+  if (!sess || sess.ruolo !== 'medico') { container.innerHTML = '<div class="ricerca-empty">Sezione riservata al medico.</div>'; return; }
+  const medico = sess.user;
+  if (!_agendaData) _agendaData = new Date().toISOString().slice(0, 10);
+  const oggiISO = new Date().toISOString().slice(0, 10);
+  const spostaGiorno = (delta) => { const d = new Date(_agendaData + 'T12:00:00'); d.setDate(d.getDate() + delta); _agendaData = d.toISOString().slice(0, 10); renderAgenda(container); };
+
+  const dObj = new Date(_agendaData + 'T12:00:00');
+  const dataLabel = dObj.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const lista = appuntamentiDelGiorno(medico, _agendaData);
+  const trash = '<path d="M4 7h16M9 7V5h6v2M6 8l1 12h10l1-12"/>';
+
+  const righe = lista.length ? lista.map(a => {
+    const prest = a.prestazione ? `<span style="display:inline-block; font-size:0.72rem; color:var(--txt2); background:var(--card); border:1px solid var(--bordo); border-radius:999px; padding:1px 9px; margin-left:6px; white-space:nowrap;">${escapeHtml(a.prestazione)}</span>` : '';
+    const tel = a.telefono ? `<a href="tel:${escapeHtml(a.telefono)}" onclick="event.stopPropagation();" style="color:var(--txt2); text-decoration:none; font-size:0.8rem;">${escapeHtml(a.telefono)}</a>` : '';
+    const note = a.note ? `<div style="font-size:0.78rem; color:var(--txt2); margin-top:3px;">${escapeHtml(a.note)}</div>` : '';
+    const arrivato = a.arrivato ? `<span style="display:inline-flex; align-items:center; gap:4px; color:#2e7d32; font-size:0.74rem; font-weight:600;">${_svgInline(ICO.check, 13)} in sala</span>` : '';
+    return `
+      <div class="agenda-appt" data-id="${a.id}" style="display:flex; gap:14px; align-items:flex-start; padding:11px 14px; border-bottom:1px solid var(--bordo); cursor:pointer;">
+        <div style="text-align:right; min-width:56px;">
+          <div style="font-weight:700; font-size:1rem; font-variant-numeric:tabular-nums;">${escapeHtml(a.ora || '')}</div>
+          <div style="font-size:0.66rem; color:var(--txt3);">${a.durata ? a.durata + ' min' : ''}</div>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:600;">${escapeHtml(a.paziente || '(senza nome)')}${prest}</div>
+          <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:2px;">${tel}${arrivato}</div>
+          ${note}
+        </div>
+        <div style="display:flex; gap:6px; flex:none;" onclick="event.stopPropagation();">
+          ${a.arrivato ? '' : `<button class="agenda-btn" data-checkin="${a.id}" title="Segna arrivato → Sala d'attesa">→ Sala</button>`}
+          <button class="agenda-btn" data-del="${a.id}" title="Elimina" style="color:#b23a2f;">${_svgInline(trash, 14)}</button>
+        </div>
+      </div>`;
+  }).join('') : `<div class="ricerca-empty" style="padding:26px 14px;">Nessun appuntamento per questa giornata.</div>`;
+
+  container.innerHTML = `
+<div style="max-width:760px;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+    <h2 style="font-size:1.5rem; margin:0; flex:1; text-transform:capitalize; min-width:180px;">${dataLabel}</h2>
+    <button class="agenda-btn" id="ag-prev" title="Giorno precedente">‹</button>
+    <button class="agenda-btn" id="ag-oggi">Oggi</button>
+    <button class="agenda-btn" id="ag-next" title="Giorno successivo">›</button>
+  </div>
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+    <input type="date" id="ag-data" value="${_agendaData}" class="ricerca-data">
+    <span style="font-size:0.85rem; color:var(--txt2);">${lista.length} appuntament${lista.length === 1 ? 'o' : 'i'}</span>
+    <button class="btn btn-primary" id="ag-nuovo" style="margin-left:auto;">+ Nuovo appuntamento</button>
+  </div>
+  <div class="card" style="padding:0; overflow:hidden;">${righe}</div>
+</div>`;
+
+  container.querySelector('#ag-prev').onclick = () => spostaGiorno(-1);
+  container.querySelector('#ag-next').onclick = () => spostaGiorno(1);
+  container.querySelector('#ag-oggi').onclick = () => { _agendaData = oggiISO; renderAgenda(container); };
+  container.querySelector('#ag-data').onchange = (e) => { if (e.target.value) { _agendaData = e.target.value; renderAgenda(container); } };
+  container.querySelector('#ag-nuovo').onclick = () => apriModaleAppuntamento(medico, null, () => renderAgenda(container));
+  container.querySelectorAll('.agenda-appt').forEach(el => el.onclick = () => {
+    const a = appuntamentiMedico(medico).find(x => x.id === el.dataset.id);
+    if (a) apriModaleAppuntamento(medico, a, () => renderAgenda(container));
+  });
+  container.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    if (confirm('Eliminare questo appuntamento?')) { eliminaAppuntamento(medico, b.dataset.del); renderAgenda(container); }
+  });
+  container.querySelectorAll('[data-checkin]').forEach(b => b.onclick = () => {
+    const a = appuntamentiMedico(medico).find(x => x.id === b.dataset.checkin);
+    if (a && confirm('Segnare “' + (a.paziente || 'paziente') + '” come arrivato e metterlo in sala d\'attesa?')) { checkinAppuntamento(medico, a); renderAgenda(container); }
+  });
+}
+registerRenderer('agenda', function() { renderAgenda(document.getElementById('view-agenda')); });
+
+// Crea un paziente in sala d'attesa a partire dalla prenotazione (riusa il flusso esistente).
+function checkinAppuntamento(medico, appt) {
+  const p = { ...nuovoPaziente(), stato: STATI.REGISTRATO };
+  p.medicoAssegnato = medico;
+  const parts = (appt.paziente || '').trim().split(/\s+/);
+  p.anagrafica.cognome = parts[0] || (appt.paziente || '');
+  p.anagrafica.nome = parts.slice(1).join(' ');
+  p.anagrafica.telefono = appt.telefono || '';
+  const salvato = db.savePaziente(p);
+  pushEvento(salvato.id, STATI.REGISTRATO);
+  salvaAppuntamento(medico, { id: appt.id, arrivato: true, pazienteId: salvato.id });
+  return salvato;
+}
+
+function apriModaleAppuntamento(medico, appt, onSave) {
+  const isEdit = !!appt;
+  const a = appt || { data: _agendaData, ora: '', durata: 20, paziente: '', telefono: '', prestazione: '', note: '' };
+  const durate = [10, 15, 20, 30, 45, 60];
+  const prestOpts = ['', ...prestazioniDisponibili(medico)].map(x => `<option value="${escapeHtml(x)}" ${a.prestazione === x ? 'selected' : ''}>${x ? escapeHtml(x) : '—'}</option>`).join('');
+  const lab = "display:block; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--txt2); margin-bottom:5px;";
+  const fld = 'width:100%; padding:10px 12px; border:1px solid var(--bordo); border-radius:9px; background:#fff; font-size:0.95rem; color:var(--txt); outline:none; box-sizing:border-box;';
+  const ov = document.createElement('div'); ov.className = 'modal-overlay'; ov.id = 'appt-modal';
+  ov.innerHTML = `
+    <div class="modal-box" role="dialog" aria-modal="true">
+      <div class="modal-head"><h3>${isEdit ? 'Modifica appuntamento' : 'Nuovo appuntamento'}</h3><button type="button" class="modal-x" id="appt-x">×</button></div>
+      <div class="modal-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+          <div><label style="${lab}">Data</label><input type="date" id="appt-data" value="${a.data || ''}" style="${fld}"></div>
+          <div><label style="${lab}">Ora</label><input type="time" id="appt-ora" value="${a.ora || ''}" style="${fld}"></div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
+          <div><label style="${lab}">Durata</label><select id="appt-durata" style="${fld}">${durate.map(d => `<option value="${d}" ${(+a.durata || 20) === d ? 'selected' : ''}>${d} min</option>`).join('')}</select></div>
+          <div><label style="${lab}">Prestazione</label><select id="appt-prest" style="${fld}">${prestOpts}</select></div>
+        </div>
+        <div style="margin-top:12px;"><label style="${lab}">Paziente *</label><input type="text" id="appt-paz" value="${escapeHtml(a.paziente || '')}" placeholder="Cognome Nome" style="${fld}"></div>
+        <div style="margin-top:12px;"><label style="${lab}">Telefono</label><input type="tel" id="appt-tel" value="${escapeHtml(a.telefono || '')}" placeholder="+39 320 000 0000" style="${fld}"></div>
+        <div style="margin-top:12px;"><label style="${lab}">Note</label><textarea id="appt-note" rows="2" style="${fld}">${escapeHtml(a.note || '')}</textarea></div>
+        <div id="appt-err" style="color:#b23a2f; font-size:12.5px; margin-top:10px;"></div>
+      </div>
+      <div class="modal-foot">
+        ${isEdit ? '<button type="button" class="btn" id="appt-del" style="color:#b23a2f; margin-right:auto;">Elimina</button>' : ''}
+        <button type="button" class="btn" id="appt-annulla">Annulla</button>
+        <button type="button" class="btn btn-primary" id="appt-salva">Salva</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov); document.body.style.overflow = 'hidden';
+  const chiudi = () => { ov.remove(); document.body.style.overflow = ''; };
+  ov.addEventListener('click', e => { if (e.target === ov) chiudi(); });
+  ov.querySelector('#appt-x').onclick = chiudi;
+  ov.querySelector('#appt-annulla').onclick = chiudi;
+  ov.querySelector('#appt-salva').onclick = () => {
+    const paz = ov.querySelector('#appt-paz').value.trim();
+    const data = ov.querySelector('#appt-data').value;
+    const ora = ov.querySelector('#appt-ora').value;
+    if (!paz) { ov.querySelector('#appt-err').textContent = 'Inserisci il nome del paziente.'; return; }
+    if (!data || !ora) { ov.querySelector('#appt-err').textContent = 'Inserisci data e ora.'; return; }
+    salvaAppuntamento(medico, {
+      id: appt ? appt.id : undefined,
+      data, ora, durata: +ov.querySelector('#appt-durata').value,
+      paziente: paz, telefono: ov.querySelector('#appt-tel').value.trim(),
+      prestazione: ov.querySelector('#appt-prest').value,
+      note: ov.querySelector('#appt-note').value.trim()
+    });
+    _agendaData = data;
+    chiudi(); if (onSave) onSave();
+  };
+  const del = ov.querySelector('#appt-del');
+  if (del) del.onclick = () => { if (confirm('Eliminare questo appuntamento?')) { eliminaAppuntamento(medico, appt.id); chiudi(); if (onSave) onSave(); } };
+  ov.querySelector('#appt-paz').focus();
+}
 
 // ── Renderer: nuovo paziente (dal lato medico) ────────────────────────────────
 // Renderer: "Nuovo paziente" del medico — stesso identico form della registrazione
