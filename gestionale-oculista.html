@@ -4963,7 +4963,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v6'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v7'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -5013,6 +5013,12 @@ function seedDemoData() {
     'Ambliopia OD in trattamento. Terapia occlusiva continuata.',
     'Pressione intraoculare borderline (21 mmHg OD). Tonometria di controllo.'
   ];
+
+  const APO = ['Negativa.', 'Nulla di rilevante.', 'Pregressa congiuntivite allergica.', 'Portatore di lenti a contatto da alcuni anni.', 'Blefarite cronica lieve.', 'Pregressa correzione laser.', 'Occhio secco lieve.', 'Familiarità per glaucoma.', 'Pregresso intervento di cataratta.'];
+  const APG = ['Negativa.', 'Ipertensione arteriosa in terapia.', 'Diabete mellito tipo 2.', 'Ipotiroidismo in terapia sostitutiva.', 'Nessuna patologia sistemica di rilievo.', 'Dislipidemia.', 'Cardiopatia in follow-up.', 'Terapia anticoagulante orale.'];
+  const ANNESSI = ['Annessi nella norma. Cornea trasparente, camera anteriore otticamente vuota, cristallino trasparente.', 'Segmento anteriore nei limiti. Iride trofica, pupilla normoreagente alla luce.', 'Lieve iperemia congiuntivale. Cornea integra. Cristallino con iniziale opacità nucleare.', 'Menisco lacrimale ridotto, BUT ridotto. Segmento anteriore per il resto nella norma.'];
+  const FUNDUS = ['Papilla a margini netti, escavazione fisiologica. Macula e retina periferica nella norma.', 'Rapporto cup/disc 0.3. Macula applicata, riflesso foveale presente. Vasi di calibro regolare.', "Iniziali alterazioni dell'epitelio pigmentato maculare. Periferia retinica applicata.", 'Papilla pallida nei limiti. Nessuna lesione periferica evidente.'];
+  const NOTE_MED = ['Controllo tra 6 mesi.', 'Consigliata protezione UV.', 'Rivalutazione a 12 mesi.', 'Prescritta terapia come da referto.', 'Consigliato controllo della pressione oculare.'];
 
   const MOTIVI = [
     { controllo: true },
@@ -5070,7 +5076,10 @@ function seedDemoData() {
     ctx.stroke();
     return c.toDataURL('image/png');
   }
+  // Poche firme generate una volta e riusate (evita centinaia di render su mobile).
+  const FIRME_POOL = Array.from({ length: 6 }, () => firmaFinta());
 
+  const tuttiSeed = []; // accumulo e salvo una sola volta (niente O(n²))
   function crea(anagrafica, stato, medico, minutiFa, referto) {
     const p = nuovoPaziente();
     p.anagrafica = { ...p.anagrafica, ...anagrafica };
@@ -5096,7 +5105,8 @@ function seedDemoData() {
     });
     p.stato = stato;
     // Consenso firmato per gli stati che lo prevedono (consenso firmato / completato)
-    if (stato === STATI.CONSENSO || stato === STATI.COMPLETATO) p.firmaConsenso = firmaFinta();
+    // Firma-immagine solo per i consensi attivi e le visite recenti (alleggerisce lo storico).
+    if (stato === STATI.CONSENSO || (stato === STATI.COMPLETATO && minutiFa < 12 * 1440)) p.firmaConsenso = pick(FIRME_POOL);
     // Consenso al trattamento accettato in registrazione (demo: ~85% sì, alcuni no)
     if (rand() > 0.15) p.consensoTrattamento = { accettato: true, ts: ago(minutiFa + 4) };
     // Pagamento: le visite completate hanno una parcella (demo, mix incassato/da incassare)
@@ -5107,7 +5117,7 @@ function seedDemoData() {
       const totale = Math.max(0, pres.reduce((s, r) => s + r.importo, 0) - sconto);
       p.pagamento = { prestazioni: pres, sconto, totale, stato: rand() > 0.3 ? 'incassato' : 'da_incassare', ts: ago(minutiFa) };
     }
-    db._save([...db.getPazienti(), p]);
+    tuttiSeed.push(p);
   }
 
   // Genera pazienti per un medico
@@ -5139,20 +5149,37 @@ function seedDemoData() {
       const asse = () => String(rndInt(0,180));
       const pres = () => String(rndInt(12,22));
       return {
+        apoOD: pick(APO), apoOS: pick(APO),
+        apgOD: pick(APG), apgOS: pick(APG),
+        annessi: pick(ANNESSI),
+        visusOD: vis(), visusOS: vis(),
         acuitaLontanoOD: vis(), acuitaLontanoOS: vis(),
         acuitaVicinoOD: vis(), acuitaVicinoOS: vis(),
         refOD: { sph: sph(), cyl: cyl(), asse: asse() },
         refOS: { sph: sph(), cyl: cyl(), asse: asse() },
         pressioneOD: pres(), pressioneOS: pres(),
-        diagnosi: d
+        fundusOD: pick(FUNDUS), fundusOS: pick(FUNDUS),
+        diagnosi: d,
+        noteMedico: rand() > 0.6 ? pick(NOTE_MED) : ''
       };
     }
 
-    // 70 completati (storico, da mesi/anni fa)
-    for (let i = 0; i < 70; i++) {
-      const daysAgo = rndInt(10, 730);
-      crea(prossimo(), STATI.COMPLETATO, medicoKey, daysAgo * 1440 + offset + i, refertoCasuale());
+    // Storico "profondo" (qualche mese fa) per dare corpo all'archivio
+    for (let i = 0; i < 20; i++) {
+      const daysAgo = rndInt(35, 400);
+      crea(prossimo(), STATI.COMPLETATO, medicoKey, daysAgo * 1440 + rndInt(60, 540) + offset, refertoCasuale());
       idx++;
+    }
+    // Simulazione di ~30 giorni di attività reale: visite completate ogni giorno
+    // (chiuso la domenica, sabato ridotto), con volume variabile e referti verosimili.
+    for (let d = 0; d <= 30; d++) {
+      const dow = new Date(now - d * 1440 * 60000).getDay();
+      if (dow === 0) continue;                                   // domenica: chiuso
+      const nVisite = dow === 6 ? rndInt(2, 4) : rndInt(5, 9);   // sabato ridotto
+      for (let k = 0; k < nVisite; k++) {
+        crea(prossimo(), STATI.COMPLETATO, medicoKey, d * 1440 + rndInt(60, 560) + offset, refertoCasuale());
+        idx++;
+      }
     }
 
     // 10 refertati (da firmare)
@@ -5194,6 +5221,7 @@ function seedDemoData() {
   generaPerMedico('rossi', 0);
   generaPerMedico('bianchi', 1000);
 
+  db._save(tuttiSeed);
   localStorage.setItem('oculista_seed', SEED_VERSION);
 }
 
