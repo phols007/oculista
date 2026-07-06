@@ -930,13 +930,6 @@
       </div>
     </div>
 
-    <div id="view-lista-pazienti" class="view">
-      <div class="placeholder">
-        <h2>Lista Pazienti</h2>
-        <p>Archivio pazienti — in costruzione.</p>
-      </div>
-    </div>
-
     <div id="view-ricerca" class="view">
       <!-- Populated by renderer 'ricerca' -->
     </div>
@@ -1567,7 +1560,7 @@ function registerRenderer(id, fn) {
 // ── Titoli vista per topbar mobile ───────────────────────────────────────────
 const _VIEW_TITLES = {
   board: 'Board Pazienti', 'in-attesa': 'In Attesa',
-  'lista-pazienti': 'Storico Pazienti', ricerca: 'Ricerca',
+  ricerca: 'Ricerca',
   nuovo: 'Nuovo Paziente', dettaglio: 'Dettaglio', referto: 'Referto',
   'firma-consenso': 'Firma Consenso', registrazione: 'Registrazione',
   'firma-kiosk': 'Firma consensi', qr: 'Il mio QR Code', prestazioni: 'Prestazioni', agenda: 'Agenda'
@@ -1647,7 +1640,6 @@ function renderSidebar() {
       <div class="nav-item" data-view="agenda">📅 Agenda</div>
 
       <div class="sidebar-title">Pazienti</div>
-      <div class="nav-item" data-view="lista-pazienti">🗂 Lista</div>
       <div class="nav-item" data-view="ricerca">🔍 Ricerca</div>
       <div class="nav-item" data-view="nuovo">➕ Nuovo</div>
 
@@ -4147,108 +4139,6 @@ function inviaRefertoEmail(id) {
   window.location.href = 'mailto:' + encodeURIComponent(email) +
     '?subject=' + encodeURIComponent(oggetto) + '&body=' + encodeURIComponent(corpo);
 }
-
-// ── renderListaPazienti ───────────────────────────────────────────────────────
-function renderListaPazienti(container) {
-  const ORDINE_STATI = [
-    STATI.IN_CORSO, STATI.IN_STOP, STATI.IN_ATTESA, STATI.REGISTRATO,
-    STATI.REFERTATO, STATI.CONSENSO, STATI.COMPLETATO
-  ];
-
-  function ordina(lista) {
-    return lista.slice().sort((a, b) => {
-      const ia = ORDINE_STATI.indexOf(a.stato);
-      const ib = ORDINE_STATI.indexOf(b.stato);
-      if (ia !== ib) return ia - ib;
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-    });
-  }
-
-  function righeHTML(pazienti) {
-    if (pazienti.length === 0) {
-      return `<tr><td colspan="5" style="text-align:center; padding:32px; color:var(--txt2);">Nessun paziente trovato.</td></tr>`;
-    }
-    return pazienti.map(p => {
-      const nome   = nomeCompleto(p) || '(senza nome)';
-      const medico = p.medicoAssegnato && UTENTI[p.medicoAssegnato]
-        ? UTENTI[p.medicoAssegnato].nome : (p.medicoAssegnato || '—');
-      const data   = p.createdAt ? new Date(p.createdAt).toLocaleDateString('it-IT') : '—';
-      const ultima = p.eventi && p.eventi.length
-        ? new Date(p.eventi[p.eventi.length - 1].ts).toLocaleString('it-IT') : '—';
-      return `
-        <tr class="lista-row" data-id="${p.id}" title="Apri dettaglio">
-          <td style="font-weight:600;">${nome}</td>
-          <td class="col-hide">${data}</td>
-          <td class="col-hide">${medico}</td>
-          <td>${badgeStato(p.stato)}</td>
-          <td class="col-hide">${ultima}</td>
-        </tr>`;
-    }).join('');
-  }
-
-  function appliFiltro() {
-    // Filtro pagamento: di default nasconde i "da incassare" (vedi tasto segreto)
-    const base     = db.getPazienti().filter(pagamentoVisibile);
-    const testo    = (container.querySelector('#lista-cerca') || {}).value || '';
-    const stato    = (container.querySelector('#lista-stato-filtro') || {}).value || '';
-    let filtrati   = base;
-    if (testo.trim()) {
-      const q = testo.trim().toLowerCase();
-      filtrati = filtrati.filter(p => nomeCompleto(p).toLowerCase().includes(q));
-    }
-    if (stato) filtrati = filtrati.filter(p => p.stato === stato);
-    filtrati = ordina(filtrati);
-
-    const tbody = container.querySelector('.lista-table tbody');
-    if (tbody) tbody.innerHTML = righeHTML(filtrati);
-    const contatore = container.querySelector('#lista-contatore');
-    if (contatore) contatore.textContent = filtrati.length !== base.length
-      ? filtrati.length + ' di ' + base.length + ' pazienti'
-      : base.length + ' pazienti';
-
-    container.querySelectorAll('.lista-row').forEach(row => {
-      row.addEventListener('click', () => apriDettaglio(row.dataset.id));
-    });
-  }
-
-  const tutti = db.getPazienti();
-  const opzioniStato = ['', ...ORDINE_STATI].map(s =>
-    `<option value="${s}">${s || 'Tutti gli stati'}</option>`
-  ).join('');
-
-  container.innerHTML = `
-<div style="max-width:900px;">
-  <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px; flex-wrap:wrap;">
-    <h2 style="font-size:1.3rem; font-weight:700; margin:0; flex:1;">Storico Pazienti</h2>
-    <span id="lista-contatore" style="font-size:0.85rem; color:var(--txt2);">${tutti.length} pazienti</span>
-  </div>
-  <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
-    <input id="lista-cerca" type="search" placeholder="Cerca per nome…"
-      style="flex:1; min-width:180px; padding:8px 12px; border:1px solid var(--bordo); border-radius:10px; font-size:0.9rem; background:#fff;">
-    <select id="lista-stato-filtro" style="padding:8px 12px; border:1px solid var(--bordo); border-radius:10px; font-size:0.9rem; background:#fff;">
-      ${opzioniStato}
-    </select>
-  </div>
-  <div style="overflow-x:auto;">
-    <table class="lista-table">
-      <thead>
-        <tr>
-          <th>Paziente</th><th class="col-hide">Data reg.</th><th class="col-hide">Medico</th><th>Stato</th><th class="col-hide">Ultimo agg.</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-</div>`;
-
-  container.querySelector('#lista-cerca').addEventListener('input', appliFiltro);
-  container.querySelector('#lista-stato-filtro').addEventListener('change', appliFiltro);
-  appliFiltro(); // popola la tabella applicando il filtro pagamento
-}
-
-registerRenderer('lista-pazienti', function() {
-  renderListaPazienti(document.getElementById('view-lista-pazienti'));
-});
 
 // ── Ricerca (paziente + referto) ──────────────────────────────────────────────
 // Stato di ricerca persistente tra i render (quale tab è attivo)
