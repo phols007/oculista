@@ -1471,12 +1471,27 @@ function pushEvento(id, stato, opts = {}) {
       if (!confirm('⚠️ ' + v.motivo + '\n\nVuoi procedere comunque?')) return;
     }
   }
+  // Regola: un medico ha UN solo paziente "In corso" alla volta. Prendendone in
+  // carico uno, gli altri suoi "In corso" vanno automaticamente in stop.
+  if (stato === STATI.IN_CORSO) {
+    mettiInStopAltriInCorso(p.medicoAssegnato || (sessionCorrente() && sessionCorrente().user), id);
+  }
   const ev = {
     stato,
     ts: new Date().toISOString(),
     utente: (sessionCorrente && sessionCorrente()?.user) || 'paziente'
   };
   return db.updatePaziente(id, { stato, eventi: [...(p.eventi || []), ev] });
+}
+
+// Mette in stop gli altri pazienti "In corso" dello stesso medico (regola: 1 solo in corso).
+function mettiInStopAltriInCorso(medico, exceptId) {
+  if (!medico) return;
+  db.getPazienti().forEach(q => {
+    if (q.id !== exceptId && q.stato === STATI.IN_CORSO && q.medicoAssegnato === medico) {
+      pushEvento(q.id, STATI.IN_STOP, { force: true });
+    }
+  });
 }
 
 // ── Cronometro pausa ──────────────────────────────────────────────────────────
@@ -2950,6 +2965,14 @@ function renderBoard(container, filtroSoloAttesa) {
   const inCorso = tutti.filter(p =>
     p.stato === STATI.IN_CORSO && p.medicoAssegnato === me
   );
+
+  // Invariante: un solo "In corso" per medico. Se ne trovo più d'uno (dati vecchi),
+  // tengo quello preso in carico più di recente e metto gli altri in stop, poi rifaccio.
+  if (inCorso.length > 1) {
+    const tieni = inCorso.slice().sort((a, b) => Date.parse(inizioStatoCorrente(b)) - Date.parse(inizioStatoCorrente(a)))[0];
+    inCorso.forEach(p => { if (p.id !== tieni.id) pushEvento(p.id, STATI.IN_STOP, { force: true }); });
+    return renderBoard(container, filtroSoloAttesa);
+  }
 
   // In stop: assegnati a me
   const inStop = tutti.filter(p =>
@@ -5144,15 +5167,15 @@ function seedDemoData() {
       idx++;
     }
 
-    // 2 in corso
+    // 1 in corso (regola: un solo paziente in corso alla volta)
+    crea(prossimo(), STATI.IN_CORSO, medicoKey, rndInt(5, 30));
+    idx++;
+
+    // 2 in stop
     for (let i = 0; i < 2; i++) {
-      crea(prossimo(), STATI.IN_CORSO, medicoKey, rndInt(5, 30) + i * 3);
+      crea(prossimo(), STATI.IN_STOP, medicoKey, rndInt(10, 40) + i * 4);
       idx++;
     }
-
-    // 1 in stop
-    crea(prossimo(), STATI.IN_STOP, medicoKey, rndInt(10, 40));
-    idx++;
 
     // 7 in attesa
     for (let i = 0; i < 7; i++) {
