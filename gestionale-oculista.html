@@ -4963,7 +4963,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v7'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v8'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -5222,6 +5222,38 @@ function seedDemoData() {
   generaPerMedico('bianchi', 1000);
 
   db._save(tuttiSeed);
+
+  // Popola l'agenda con i pazienti visitati (completati): un appuntamento sul
+  // giorno della visita, con orario ipotetico distribuito tra le 08:00 e le 18:00.
+  const apptByMed = {};
+  const perGiorno = {};
+  tuttiSeed.forEach(p => {
+    if (p.stato !== STATI.COMPLETATO) return;
+    const ts = (p.pagamento && p.pagamento.ts) || p.updatedAt;
+    const data = new Date(ts).toISOString().slice(0, 10);
+    const key = p.medicoAssegnato + '|' + data;
+    (perGiorno[key] = perGiorno[key] || []).push(p);
+  });
+  Object.keys(perGiorno).forEach(key => {
+    const [medico, data] = key.split('|');
+    const lista = perGiorno[key].sort((a, b) =>
+      Date.parse((a.pagamento && a.pagamento.ts) || a.updatedAt) - Date.parse((b.pagamento && b.pagamento.ts) || b.updatedAt));
+    const n = lista.length;
+    lista.forEach((p, i) => {
+      const minuti = 480 + Math.floor((i + 0.5) * (600 / n)); // 480=08:00 … 1080=18:00
+      const ora = String(Math.floor(minuti / 60)).padStart(2, '0') + ':' + String(minuti % 60).padStart(2, '0');
+      const a = p.anagrafica || {};
+      const snap = { cognome: a.cognome || '', nome: a.nome || '', telefono: a.telefono || '', codiceFiscale: a.codiceFiscale || '', dataNascita: a.dataNascita || '', sesso: a.sesso || '' };
+      (apptByMed[medico] = apptByMed[medico] || []).push({
+        id: 'a-seed-' + p.id, data, ora, durata: 20,
+        paziente: (snap.cognome + ' ' + snap.nome).trim(), telefono: snap.telefono,
+        prestazione: (p.pagamento && p.pagamento.prestazioni && p.pagamento.prestazioni[0] && p.pagamento.prestazioni[0].descrizione) || '',
+        note: '', arrivato: true, pazienteId: p.id, anagrafica: snap, createdAt: p.createdAt
+      });
+    });
+  });
+  localStorage.setItem(LS_APPUNTAMENTI, JSON.stringify(apptByMed));
+
   localStorage.setItem('oculista_seed', SEED_VERSION);
 }
 
