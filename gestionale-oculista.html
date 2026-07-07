@@ -4836,6 +4836,22 @@ function apriModaleAppuntamento(medico, appt, onSave) {
   const pazInput = ov.querySelector('#appt-paz');
   const telInput = ov.querySelector('#appt-tel');
   const suggBox = ov.querySelector('#appt-sugg');
+
+  // Richiama il telefono dall'anagrafica del medico (per CF o cognome+nome).
+  function telefonoAnagrafica(nome, snap) {
+    const cf = (snap && snap.codiceFiscale ? snap.codiceFiscale : '').toLowerCase();
+    const key = (nome || '').trim().toLowerCase();
+    const found = anagrafiche.find(x =>
+      (cf && x.codiceFiscale && x.codiceFiscale.toLowerCase() === cf) ||
+      (key && (x.cognome + ' ' + x.nome).trim().toLowerCase() === key)
+    );
+    return found && found.telefono ? found.telefono : '';
+  }
+  // All'apertura: se il paziente è già in anagrafica e il telefono è vuoto, richiamalo.
+  if (!telInput.value.trim()) {
+    const t = telefonoAnagrafica(pazInput.value, selezionato);
+    if (t) telInput.value = t;
+  }
   function mostraSugg() {
     const q = pazInput.value.trim().toLowerCase();
     if (!q) { suggBox.style.display = 'none'; return; }
@@ -4964,7 +4980,7 @@ registerRenderer('da-firmare', function() {
 });
 
 // ── Seed dati demo ────────────────────────────────────────────────────────────
-const SEED_VERSION = 'v8'; // incrementa per forzare reset automatico
+const SEED_VERSION = 'v9'; // incrementa per forzare reset automatico
 
 function seedDemoData() {
   if (localStorage.getItem('oculista_seed') === SEED_VERSION) return;
@@ -5133,7 +5149,7 @@ function seedDemoData() {
       const cognome = pick(COGNOMI);
       const dn = dataNascita();
       const conEmail = rand() > 0.35;
-      const conTel = rand() > 0.25;
+      const conTel = rand() > 0.1;
       return {
         cognome, nome, sesso, dataNascita: dn,
         codiceFiscale: rand() > 0.4 ? cf(sesso, dn) : '',
