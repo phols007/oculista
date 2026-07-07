@@ -787,7 +787,6 @@
         <span class="lg-brand-name">Studio Medico</span>
         <span class="lg-brand-sub">· Oculistica</span>
       </div>
-      <span onclick="tornaAllaHome()" style="display:inline-flex; align-items:center; gap:9px; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;"><span>←</span> Torna alla home</span>
     </header>
 
     <main class="lg-main">
@@ -829,81 +828,7 @@
   </div>
 </div>
 
-<!-- Home (landing con tavola ottotipica interattiva) -->
-<div id="view-home">
-  <div class="hm-root">
-    <header class="hm-header">
-      <div style="display:flex; align-items:center; gap:11px;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16150f" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span style="font-family:'Geist Mono',monospace; font-size:13px; letter-spacing:.2em; text-transform:uppercase; font-weight:500;">Studio Medico</span>
-        <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#a6a49b;">· Oculistica</span>
-      </div>
-      <nav class="hm-nav">
-        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Lo studio</span>
-        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Prestazioni</span>
-        <span class="hm-navlink" style="font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#6c6b63; cursor:pointer;">Contatti</span>
-        <span onclick="vaiAlLogin()" style="display:inline-flex; align-items:center; gap:8px; font-family:'Geist Mono',monospace; font-size:11.5px; letter-spacing:.1em; text-transform:uppercase; color:#16150f; border:1px solid #cfcdc4; border-radius:999px; padding:9px 16px; cursor:pointer;">Area riservata <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-      </nav>
-    </header>
-
-    <main class="hm-hero" id="hm-hero">
-      <div id="hm-heroText" style="will-change:transform;">
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom:26px; animation:focusIn .9s .15s both;">
-          <span style="display:inline-block; width:42px; height:1px; background:#16150f; transform-origin:left; animation:hairline .8s .2s both;"></span>
-          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#6c6b63;">Studio oculistico · su appuntamento</span>
-        </div>
-        <h1 style="font-family:'Instrument Serif',serif; font-weight:400; font-size:clamp(48px,6vw,90px); line-height:.98; letter-spacing:-.015em; margin-bottom:24px;">
-          <span style="display:block; animation:focusIn 1s .28s both;">Mettere a fuoco</span>
-          <span style="display:block; font-style:italic; color:#54534b; animation:focusIn 1s .42s both;">ciò che conta.</span>
-        </h1>
-        <p style="font-size:16.5px; line-height:1.6; color:#54534b; max-width:42ch; margin-bottom:34px; animation:focusIn 1s .56s both;">Visite oculistiche, diagnostica avanzata e chirurgia refrattiva. Uno sguardo esperto per restituire nitidezza alla tua giornata.</p>
-        <div style="display:flex; align-items:center; gap:16px; margin-bottom:40px; animation:focusIn 1s .68s both; flex-wrap:wrap;">
-          <span onclick="vaiAlLogin()" style="display:inline-flex; align-items:center; gap:10px; background:#16150f; color:#f4f3f0; font-size:14px; font-weight:500; padding:14px 24px; border-radius:999px; cursor:pointer;">Area riservata <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
-          <span style="display:inline-flex; align-items:center; gap:9px; font-size:14px; color:#16150f; padding:14px 6px;">Scopri lo studio <span style="font-family:'Geist Mono',monospace; color:#a6a49b;">→</span></span>
-        </div>
-        <div style="display:flex; align-items:center; gap:18px; animation:focusIn 1s .82s both; flex-wrap:wrap;">
-          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#a6a49b;">Lun–Ven · 9–19</span>
-          <span style="width:4px; height:4px; border-radius:50%; background:#cfcdc4;"></span>
-          <span style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#a6a49b;">Diagnostica in sede</span>
-        </div>
-      </div>
-
-      <div id="hm-snellen" style="position:relative; background:#fbfbf9; border:1px solid #e2e0d8; border-radius:8px; box-shadow:0 1px 0 #ffffff inset, 0 40px 80px -50px rgba(20,18,12,.4); padding:34px 40px 30px; --mx:50%; --my:42%; --lens:150px; --lin:90px;">
-        <span style="position:absolute; top:14px; left:14px; width:14px; height:14px; border-top:1px solid #cfcdc4; border-left:1px solid #cfcdc4;"></span>
-        <span style="position:absolute; top:14px; right:14px; width:14px; height:14px; border-top:1px solid #cfcdc4; border-right:1px solid #cfcdc4;"></span>
-        <span style="position:absolute; bottom:14px; left:14px; width:14px; height:14px; border-bottom:1px solid #cfcdc4; border-left:1px solid #cfcdc4;"></span>
-        <span style="position:absolute; bottom:14px; right:14px; width:14px; height:14px; border-bottom:1px solid #cfcdc4; border-right:1px solid #cfcdc4;"></span>
-
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
-          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; color:#a6a49b;">Tavola ottotipica</span>
-          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#a6a49b;">Distanza 6 m</span>
-        </div>
-
-        <div id="hm-chartInner" style="position:relative; will-change:transform;">
-          <div id="hm-chartSharp">
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .25s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(64px,8.5vw,116px); letter-spacing:.16em; line-height:.9; color:#16150f;">E</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/200</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .37s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(44px,5.6vw,76px); letter-spacing:.2em; line-height:.9; color:#16150f;">F P</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/100</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .49s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(33px,4.2vw,55px); letter-spacing:.22em; line-height:.9; color:#16150f;">T O Z</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/70</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .61s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(26px,3.2vw,42px); letter-spacing:.24em; line-height:.9; color:#16150f;">L P E D</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/50</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .73s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(21px,2.5vw,33px); letter-spacing:.26em; line-height:.9; color:#16150f;">P E C F D</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/40</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:7px 0; animation:focusIn .9s .85s both;"><span></span><span style="text-align:center; font-weight:700; font-size:clamp(16px,1.9vw,26px); letter-spacing:.28em; line-height:.9; color:#16150f;">E D F C Z P</span><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#bdbbb2; text-align:right;">20/30</span></div>
-            <div class="row" style="display:grid; grid-template-columns:54px 1fr 54px; align-items:center; gap:18px; padding:9px 0 4px; animation:focusIn .9s .97s both;"><span style="font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.06em; color:#16150f;">10/10</span><span style="text-align:center; font-weight:700; font-size:clamp(13px,1.5vw,20px); letter-spacing:.3em; line-height:.9; color:#16150f;">F E L O P Z D</span><span style="display:inline-flex; align-items:center; justify-content:flex-end; gap:5px; font-family:'Geist Mono',monospace; font-size:10px; letter-spacing:.1em; color:#16150f; text-align:right;"><span style="width:5px; height:5px; border-radius:50%; background:#16150f;"></span>20/20</span></div>
-          </div>
-          <div id="hm-chartBlur" style="position:absolute; inset:0; opacity:0; transition:opacity .9s ease; pointer-events:none; filter:blur(5px); -webkit-mask-image:radial-gradient(circle at var(--mx) var(--my), transparent 0, transparent var(--lin), #000 var(--lens)); mask-image:radial-gradient(circle at var(--mx) var(--my), transparent 0, transparent var(--lin), #000 var(--lens));"></div>
-        </div>
-
-        <div style="display:flex; align-items:center; gap:9px; margin-top:18px; padding-top:16px; border-top:1px solid #eceae6;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a6a49b" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <span style="font-family:'Geist Mono',monospace; font-size:10.5px; letter-spacing:.08em; color:#a6a49b;">Muovi il mouse sulla tavola per mettere a fuoco</span>
-        </div>
-      </div>
-    </main>
-
-    <!-- palpebre della home -->
-    <div class="lg-eyelid top closed" id="hmEyelidTop"></div>
-    <div class="lg-eyelid bot closed" id="hmEyelidBot"></div>
-  </div>
-</div>
+<!-- Home rimossa: ingresso diretto al login -->
 
 <button id="hamburger" aria-label="Menu">☰</button>
 <div id="sidebar-overlay"></div>
@@ -1758,7 +1683,7 @@ function render() {
     renderSidebar();
     const le = document.getElementById('login-error');
     if (le) { le.textContent = ''; le.style.opacity = '0'; }
-    mostraHome();
+    mostraLogin();
     return;
   }
 
@@ -1905,11 +1830,11 @@ function chiudiPalpebreHome() {
   b.classList.remove('open'); b.classList.add('closed');
 }
 
-function mostraHome() {
-  const l = document.getElementById('view-login'); if (l) l.classList.remove('active');
-  const h = document.getElementById('view-home'); if (h) h.classList.add('active');
-  initHomeChart();
-  apriPalpebreHome();
+// Ingresso diretto alla schermata di login (la Home è stata rimossa).
+function mostraLogin() {
+  const l = document.getElementById('view-login'); if (l) l.classList.add('active');
+  const le = document.getElementById('login-error'); if (le) { le.textContent = ''; le.style.opacity = '0'; }
+  apriPalpebre();
 }
 
 // Home → Login (blink palpebre)
