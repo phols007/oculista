@@ -55,15 +55,18 @@
       background: #fff;
       border-right: 1px solid var(--bordo);
       padding: 16px;
+      padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
       display: flex;
       flex-direction: column;
       gap: 4px;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       position: fixed;
       top: 0; left: 0;
       width: 280px;
       max-width: 86vw;
       height: 100vh;
+      height: 100dvh; /* iOS: rispetta la barra del browser, footer sempre raggiungibile */
       z-index: 100;
       transform: translateX(-100%);
       transition: transform .25s ease;
